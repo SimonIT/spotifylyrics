@@ -10,6 +10,8 @@ import webbrowser  # to open link on browser
 from urllib import request
 
 import requests
+from cachier import cachier
+import datetime
 
 import services as s
 
@@ -78,7 +80,8 @@ the service returned a wrong song
 CURRENT_SERVICE = -1
 
 
-def load_lyrics(song: Song, sync=False):
+@cachier(stale_after=datetime.timedelta(weeks=3))
+def load_lyrics(artist, name, sync=False):
     global CURRENT_SERVICE
 
     if CURRENT_SERVICE == len(SERVICES_LIST2) - 1: CURRENT_SERVICE = -1
@@ -86,7 +89,7 @@ def load_lyrics(song: Song, sync=False):
     if sync:
         temp_lyrics = []
         for service_synced in SERVICES_LIST1:
-            lyrics, url, service_name, timed = service_synced(song)
+            lyrics, url, service_name, timed = service_synced(artist, name)
             if lyrics != s.ERROR:
                 if timed:
                     break
@@ -99,7 +102,7 @@ def load_lyrics(song: Song, sync=False):
     if sync and lyrics == s.ERROR or sync is False:
         timed = False
         for i in range(CURRENT_SERVICE + 1, len(SERVICES_LIST2)):
-            lyrics, url, service_name = SERVICES_LIST2[i](song)
+            lyrics, url, service_name = SERVICES_LIST2[i](artist, name)
             CURRENT_SERVICE = i
             if lyrics != s.ERROR:
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
@@ -116,11 +119,11 @@ def load_infos(song: Song):
     threading.Thread(target=s._welchertanz, args=(song,)).start()
 
 
-def get_lyrics(song: Song, sync=False):
+def get_lyrics(artist, name, sync=False):
     global CURRENT_SERVICE
     CURRENT_SERVICE = -1
 
-    return load_lyrics(song, sync)
+    return load_lyrics(artist, name, sync)
 
 
 def next_lyrics(song: Song):

@@ -21,7 +21,7 @@ else:
 LYRICS_DIR = os.path.join(SETTINGS_DIR, "lyrics")
 
 
-def _local(song):
+def _local(artist, name):
     service_name = "Local"
     url = ""
     timed = False
@@ -35,8 +35,8 @@ def _local(song):
                 file_extension = file_parts[1].lower()
                 if file_extension in (".txt", ".lrc"):
                     file_name = file_parts[0].lower()
-                    path_song_name = pathvalidate.sanitize_filename(song.name.lower())
-                    path_artist_name = pathvalidate.sanitize_filename(song.artist.lower())
+                    path_song_name = pathvalidate.sanitize_filename(name.lower())
+                    path_artist_name = pathvalidate.sanitize_filename(artist.lower())
                     if path_song_name in file_name and path_artist_name in file_name:
                         with open(file, "r", encoding="UTF-8") as lyrics_file:
                             lyrics = lyrics_file.read()
@@ -47,12 +47,12 @@ def _local(song):
     return lyrics, url, service_name, timed
 
 
-def _minilyrics(song):
+def _minilyrics(artist, name):
     service_name = "Mini Lyrics"
     url = ""
     timed = False
     try:
-        data = minilyrics.MiniLyrics(song.artist, song.name)
+        data = minilyrics.MiniLyrics(artist, name)
         for item in data:
             if item['url'].endswith(".lrc"):
                 url = item['url']
@@ -63,19 +63,19 @@ def _minilyrics(song):
         lyrics = ERROR
     if url == "":
         lyrics = ERROR
-    if song.artist.lower().replace(" ", "") not in lyrics.lower().replace(" ", ""):
+    if artist.lower().replace(" ", "") not in lyrics.lower().replace(" ", ""):
         lyrics = ERROR
         timed = False
 
     return lyrics, url, service_name, timed
 
 
-def _wikia(song):
+def _wikia(artist, name):
     service_name = "Wikia"
     url = ""
     try:
-        lyrics = minilyrics.LyricWikia(song.artist, song.name)
-        url = "http://lyrics.wikia.com/%s:%s" % (song.artist.replace(' ', '_'), song.name.replace(' ', '_'))
+        lyrics = minilyrics.LyricWikia(artist, name)
+        url = "http://lyrics.wikia.com/%s:%s" % (artist.replace(' ', '_'), name.replace(' ', '_'))
     except Exception:
         lyrics = ERROR
     if "TrebleClef.png" in lyrics:
@@ -87,12 +87,12 @@ def _wikia(song):
     return lyrics, url, service_name
 
 
-def _musixmatch(song):
+def _musixmatch(artist, name):
     service_name = "Musixmatch"
     url = ""
     try:
         search_url = "https://www.musixmatch.com/search/%s-%s/tracks" % (
-            song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
+            artist.replace(' ', '-'), name.replace(' ', '-'))
         header = {"User-Agent": "curl/7.9.8 (i686-pc-linux-gnu) libcurl 7.9.8 (OpenSSL 0.9.6b) (ipv6 enabled)"}
         search_results = requests.get(search_url, headers=header, proxies=PROXY)
         soup = BeautifulSoup(search_results.text, 'html.parser')
@@ -105,19 +105,16 @@ def _musixmatch(song):
         lyrics = lyrics.replace("\\", "")
         if lyrics.strip() == "":
             lyrics = ERROR
-        album = soup.find(class_="mxm-track-footer__album")
-        if album:
-            song.album = album.find(class_="mui-cell__title").getText()
     except Exception:
         lyrics = ERROR
     return lyrics, url, service_name
 
 
-def _songmeanings(song):
+def _songmeanings(artist, name):
     service_name = "Songmeanings"
     url = ""
     try:
-        search_url = "http://songmeanings.com/m/query/?q=%s %s" % (song.artist, song.name)
+        search_url = "http://songmeanings.com/m/query/?q=%s %s" % (artist, name)
         search_results = requests.get(search_url, proxies=PROXY)
         soup = BeautifulSoup(search_results.text, 'html.parser')
         url = ""
@@ -145,12 +142,12 @@ def _songmeanings(song):
     return lyrics, url, service_name
 
 
-def _songlyrics(song):
+def _songlyrics(artist, name):
     service_name = "Songlyrics"
     url = ""
     try:
-        artistm = song.artist.replace(" ", "-")
-        songm = song.name.replace(" ", "-")
+        artistm = artist.replace(" ", "-")
+        songm = name.replace(" ", "-")
         url = "http://www.songlyrics.com/%s/%s-lyrics" % (artistm, songm)
         lyrics_page = requests.get(url, proxies=PROXY)
         soup = BeautifulSoup(lyrics_page.text, 'html.parser')
@@ -164,33 +161,33 @@ def _songlyrics(song):
     return lyrics, url, service_name
 
 
-def _genius(song):
+def _genius(artist, name):
     service_name = "Genius"
     url = ""
     try:
-        url = "http://genius.com/%s-%s-lyrics" % (song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
+        url = "http://genius.com/%s-%s-lyrics" % (artist.replace(' ', '-'), name.replace(' ', '-'))
         lyrics_page = requests.get(url, proxies=PROXY)
         soup = BeautifulSoup(lyrics_page.text, 'html.parser')
         lyrics = soup.find("div", {"class": "lyrics"}).get_text()
-        if song.artist.lower().replace(" ", "") not in soup.text.lower().replace(" ", ""):
+        if artist.lower().replace(" ", "") not in soup.text.lower().replace(" ", ""):
             lyrics = ERROR
     except Exception:
         lyrics = ERROR
     return lyrics, url, service_name
 
 
-def _versuri(song):
+def _versuri(artist, name):
     service_name = "Versuri"
     url = ""
     try:
         search_url = "https://www.versuri.ro/q/%s+%s/" % \
-                     (song.artist.replace(" ", "+").lower(), song.name.replace(" ", "+").lower())
+                     (artist.replace(" ", "+").lower(), name.replace(" ", "+").lower())
         search_results = requests.get(search_url, proxies=PROXY)
         soup = BeautifulSoup(search_results.text, 'html.parser')
         for search_results in soup.findAll('a'):
             if "/versuri/" in search_results['href']:
                 link_text = search_results.getText().lower()
-                if song.artist.lower() in link_text and song.name.lower() in link_text:
+                if artist.lower() in link_text and name.lower() in link_text:
                     url = "https://www.versuri.ro" + search_results['href']
                     break
             else:

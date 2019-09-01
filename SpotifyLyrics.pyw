@@ -451,7 +451,7 @@ class UiForm:
                     comm.signal.emit(song_name, "Loading...")
                     start = time.time()
                     self.song = backend.Song.get_from_string(song_name)
-                    lyrics, url, service_name, timed = backend.get_lyrics(song=self.song, sync=self.sync)
+                    lyrics, url, service_name, timed = backend.get_lyrics(self.song.artist, self.song.name, self.sync)
                     self.lyrics = lyrics
                     self.timed = timed
                     if self.infos:
