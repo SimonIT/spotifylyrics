@@ -21,7 +21,7 @@ if __name__ == "__main__":
 
     if SONG_ON_ALL_SERVICES:
         for service in backend.SERVICES_LIST1:
-            result = service(SONG)
+            result = service(SONG.artist, SONG.name)
             if result[0] == services.ERROR:
                 SONG_ON_ALL_SERVICES = False
                 break
@@ -30,7 +30,7 @@ if __name__ == "__main__":
 
     if SONG_ON_ALL_SERVICES:
         for service in backend.SERVICES_LIST2:
-            result = service(SONG)
+            result = service(SONG.artist, SONG.name)
             if result[0] == services.ERROR:
                 SONG_ON_ALL_SERVICES = False
                 break
