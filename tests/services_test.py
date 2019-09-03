@@ -28,6 +28,6 @@ class LyricsTest(unittest.TestCase):
             for song in self.songs:
                 path = os.path.abspath("res/" + song.artist.lower() + " - " + song.name.lower())
                 with open(path, "rb") as lyrics_words:
-                    result = service(song.artist, song.name)
+                    result = service(song)
 
                     self.assertTrue(any(x in result[0].lower() for x in pickle.load(lyrics_words)))
