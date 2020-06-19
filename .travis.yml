@@ -80,7 +80,7 @@ jobs:
         - cd ..
       before_deploy:
         - python -m pip install pyinstaller
-        - pyinstaller SpotifyLyrics.pyw -F -w -i icon.ico --add-data "icon.png;." --additional-hooks-dir=pyinstaller_hooks
+        - pyinstaller SpotifyLyrics.pyw -F -i icon.ico --add-data "icon.png;." --additional-hooks-dir=pyinstaller_hooks
       deploy:
         provider: releases
         prerelease: true
