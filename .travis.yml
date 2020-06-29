@@ -67,6 +67,9 @@ jobs:
           all_branches: true
     - os: windows
       language: cpp
+      cache:
+        directories:
+          - $LOCALAPPDATA/pip/cache
       before_install:
         - choco install python --version=3.7.6.20200110
         - export PATH="/C/Python37:/C/Python37/Scripts:$PATH"
