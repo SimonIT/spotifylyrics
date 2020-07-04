@@ -296,6 +296,8 @@ def update_spids(windows_executable: str):
                 spids.append(proc.pid)
         except psutil.NoSuchProcess:
             print("Process does not exist anymore")
+        except psutil.AccessDenied:
+            print("Cannot access the name of the process")
 
 
 def get_window_title(service: StreamingService) -> str:
