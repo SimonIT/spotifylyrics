@@ -48,6 +48,7 @@ class Song:
         song_name_parts = songstring.split(" - ")
         artist = ""
         if len(song_name_parts) > 2:
+            artist = song_name_parts[0]
             name = " - ".join(song_name_parts[1:-1])
         elif len(song_name_parts) == 2:
             artist = song_name_parts[0]
