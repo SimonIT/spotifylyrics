@@ -580,8 +580,7 @@ class UiForm:
                             self.sync_adjustment_slider.setValue(0)
                             break
                         else:
-                            if lrc[count + 1].time - (lrc.offset / 1000) - self.sync_adjustment_slider.value() \
-                                    <= time.time() - start:
+                            if lrc[count + 1].time - self.sync_adjustment_slider.value() <= time.time() - start:
                                 count += 1
                                 line_changed = True
                             if line_changed:
