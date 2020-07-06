@@ -373,7 +373,11 @@ def _azapi(song):
     if result_song["year"]:
         song.year = int(result_song["year"])
 
-    return api.getLyrics(url=result_song["url"]), result_song["url"], service
+    lyrics = api.getLyrics(url=result_song["url"])
+    if not isinstance(lyrics, str):
+        return ERROR, "", service
+
+    return lyrics, result_song["url"], service
 
 
 # tab/chord services
