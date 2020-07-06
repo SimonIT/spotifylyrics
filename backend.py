@@ -175,7 +175,7 @@ class VlcMediaPlayer(StreamingService):
 SERVICES_LIST1 = [s._rentanadviser, s._syair, s._megalobiz, s._wikia]
 
 # Without Sync.
-SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri]
+SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri, s._azapi]
 
 # Accords
 SERVICES_LIST3 = [s._ultimateguitar, s._cifraclub, s._songsterr]

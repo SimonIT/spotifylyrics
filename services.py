@@ -7,6 +7,7 @@ from urllib import request, parse
 import pathvalidate
 import requests
 import unidecode  # to remove accents
+from azapi import azapi
 from bs4 import BeautifulSoup
 
 import lyrics as minilyrics
@@ -233,18 +234,19 @@ def _musixmatch(song):
         search_results = requests.get(search_url, headers=header, proxies=PROXY)
         soup = BeautifulSoup(search_results.text, 'html.parser')
         page = re.findall('"track_share_url":"([^"]*)', soup.text)
-        url = codecs.decode(page[0], 'unicode-escape')
-        lyrics_page = requests.get(url, headers=header, proxies=PROXY)
-        soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-        if '"body":"' in soup.text:
-            lyrics = soup.text.split('"body":"')[1].split('","language"')[0]
-            lyrics = lyrics.replace("\\n", "\n")
-            lyrics = lyrics.replace("\\", "")
-            if lyrics.strip() == "":
-                lyrics = ERROR
-            album = soup.find(class_="mxm-track-footer__album")
-            if album:
-                song.album = album.find(class_="mui-cell__title").getText()
+        if page:
+            url = codecs.decode(page[0], 'unicode-escape')
+            lyrics_page = requests.get(url, headers=header, proxies=PROXY)
+            soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+            if '"body":"' in soup.text:
+                lyrics = soup.text.split('"body":"')[1].split('","language"')[0]
+                lyrics = lyrics.replace("\\n", "\n")
+                lyrics = lyrics.replace("\\", "")
+                if lyrics.strip() == "":
+                    lyrics = ERROR
+                album = soup.find(class_="mxm-track-footer__album")
+                if album:
+                    song.album = album.find(class_="mui-cell__title").getText()
     except Exception as error:
         print("%s: %s" % (service_name, error))
     return lyrics, url, service_name
@@ -351,6 +353,27 @@ def _versuri(song):
         print("%s: %s" % (service_name, error))
         lyrics = ERROR
     return lyrics, url, service_name
+
+
+def _azapi(song):
+    service = "Azapi"
+    api = azapi.AZlyrics('duckduckgo', accuracy=0.5)
+
+    api.artist = song.artist
+    api.title = song.name
+
+    songs = api.getSongs()
+
+    if song.name in songs:
+        result_song = songs[song.name]
+    else:
+        return ERROR, "", service
+
+    song.album = result_song["album"]
+    if result_song["year"]:
+        song.year = int(result_song["year"])
+
+    return api.getLyrics(url=result_song["url"]), result_song["url"], service
 
 
 # tab/chord services

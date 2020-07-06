@@ -13,3 +13,4 @@ pylrc>=0.1.2
 pathvalidate
 diskcache
 sentry-sdk
+azapi
