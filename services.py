@@ -271,11 +271,9 @@ def _songmeanings(song):
                 soup = BeautifulSoup(lyrics_page.text, 'html.parser')
                 url = "http://songmeanings.com" + link['href'][2:]
                 break
-        lis = soup.find_all("li")
-        if len(lis) > 4:
-            temp_lyrics = lis[4]
-            lyrics = temp_lyrics.getText()
-            lyrics = lyrics.split("(r,s)};})();")[1]
+        lis = soup.find_all('ul', attrs={'data-inset': True})
+        temp_lyrics = lis[1].find_all('li')[1]
+        lyrics = temp_lyrics.getText()
     except Exception as error:
         print("%s: %s" % (service_name, error))
     if lyrics == "We are currently missing these lyrics.":
