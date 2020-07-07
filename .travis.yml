@@ -7,8 +7,6 @@ jobs:
       cache: pip
       before_install:
         - sudo apt-get install libdbus-1-dev libdbus-glib-1-dev --yes
-        - chmod +x SpotifyLyrics.pyw
-        - pip install --upgrade pip
       before_script:
         - export PYTHONPATH=$PYTHONPATH:$PWD:$PWD/spotify_lyric
       script:
@@ -33,12 +31,9 @@ jobs:
       language: generic
       cache:
         directories:
-          - $HOME/Library/Caches/Homebrew
           - $HOME/.cache/pip
-      before_install:
-        - brew update
-        - pip3 install --upgrade pip
       install:
+        - python3 --version
         - pip3 install -r requirements.txt
       before_script:
         - export PYTHONPATH=$PYTHONPATH:$PWD:$PWD/spotify_lyric
@@ -46,8 +41,6 @@ jobs:
         - cd tests/
         - python3 -m unittest discover . "*_test.py"
         - cd ..
-      before_cache:
-        - brew cleanup
       before_deploy:
         - pip3 install pyinstaller
         - pyinstaller SpotifyLyrics.pyw -F -w -i icon.icns --add-data "icon.png:." --additional-hooks-dir=pyinstaller_hooks
@@ -71,7 +64,7 @@ jobs:
         directories:
           - $LOCALAPPDATA/pip/cache
       before_install:
-        - choco install python --version=3.7.6.20200110
+        - choco install python --version=3.7.8
         - export PATH="/C/Python37:/C/Python37/Scripts:$PATH"
       install:
         - python -m pip install -r requirements.txt
