@@ -198,7 +198,11 @@ def cache_lyrics(func):
 
         clean_song_name = '{}-{}'.format(song.artist, song.name)
         if not ignore_cache:
-            lyrics_metadata = cache.get(clean_song_name)
+            try:
+                lyrics_metadata = cache.get(clean_song_name)
+            except ValueError:
+                cache.delete(clean_song_name)
+                lyrics_metadata = None
             if not lyrics_metadata:
                 lyrics_metadata = func(*args, **kwargs)
                 cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
