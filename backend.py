@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -191,6 +192,14 @@ LyricsMetadata = namedtuple("LyricsMetadata", ["lyrics", "url", "service_name", 
 
 
 def cache_lyrics(func):
+    def recreate_cache():
+        global cache
+        cache_dir = cache.directory
+        cache.close()
+        shutil.rmtree(cache_dir)
+        cache = Cache(cache_dir)
+        print("Cache recreated")
+
     def wrapper(*args, **kwargs):
         song = args[0]
         sync = kwargs.get("sync", False)
@@ -201,11 +210,14 @@ def cache_lyrics(func):
             try:
                 lyrics_metadata = cache.get(clean_song_name)
             except ValueError:
-                cache.delete(clean_song_name)
+                recreate_cache()
                 lyrics_metadata = None
             if not lyrics_metadata:
                 lyrics_metadata = func(*args, **kwargs)
-                cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
+                try:
+                    cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
+                except ValueError:
+                    recreate_cache()
             return lyrics_metadata
         else:
             lyrics_metadata = func(*args, **kwargs)
