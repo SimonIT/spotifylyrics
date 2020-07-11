@@ -2,6 +2,7 @@
 import configparser
 import getpass
 import os
+import platform
 import re
 import subprocess
 import sys
@@ -786,12 +787,15 @@ if __name__ == "__main__":
     sentry_sdk.init("https://71bf000cb7c5448c8c08660b29a12c09@o407859.ingest.sentry.io/5277612",
                     release="spotifylyrics@" + str(backend.get_version()))
     with sentry_sdk.configure_scope() as scope:
-        scope.user = {"username": getpass.getuser()}
+        scope.set_user({"username": getpass.getuser()})
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             running = "pyinstaller"
         else:
             running = "source"
         scope.set_tag("running_from", running)
+        scope.set_tag("os", platform.system())
+        scope.set_tag("os_version", platform.release())
+        scope.set_tag("architecture", platform.machine())
     APP = QtWidgets.QApplication(sys.argv)
     APP.setStyle("fusion")
     FORM = FormWidget()
