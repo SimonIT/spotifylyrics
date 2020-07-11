@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-import sys
-import webbrowser
-
-import sentry_sdk
 import configparser
+import getpass
 import os
 import re
 import subprocess
+import sys
 import threading
 import time
+import webbrowser
 
 import pathvalidate
 import pylrc
+import sentry_sdk
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QSystemTrayIcon, QAction, QMenu, qApp, QMessageBox
 
@@ -786,6 +786,7 @@ if __name__ == "__main__":
     sentry_sdk.init("https://71bf000cb7c5448c8c08660b29a12c09@o407859.ingest.sentry.io/5277612",
                     release="spotifylyrics@" + str(backend.get_version()))
     with sentry_sdk.configure_scope() as scope:
+        scope.user = {"username": getpass.getuser()}
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             running = "pyinstaller"
         else:
