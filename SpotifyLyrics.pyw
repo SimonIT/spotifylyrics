@@ -220,7 +220,10 @@ class UiForm:
         config = configparser.ConfigParser(strict=False)
         if not save:
             self.is_loading_settings = True
-            config.read(settings_file)
+            try:
+                config.read(settings_file)
+            except configparser.MissingSectionHeaderError:
+                pass
 
             self.sync = config.getboolean(section, "syncedlyrics", fallback=False)
             self.ontop = config.getboolean(section, "alwaysontop", fallback=False)
