@@ -212,7 +212,7 @@ def cache_lyrics(func):
             except ValueError:
                 recreate_cache()
                 lyrics_metadata = None
-            if not lyrics_metadata:
+            if not lyrics_metadata or lyrics_metadata.lyrics == s.ERROR:
                 lyrics_metadata = func(*args, **kwargs)
                 try:
                     cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
