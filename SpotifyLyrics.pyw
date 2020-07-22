@@ -17,7 +17,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QSystemTrayIcon, QAction, QMenu, qApp, QMessageBox
 
 import backend
-from services import SETTINGS_DIR, LYRICS_DIR
+from services import Config
 
 if os.name == "nt":
     import ctypes
@@ -210,7 +210,7 @@ class UiForm:
         if self.is_loading_settings:
             return
 
-        settings_file = SETTINGS_DIR + "settings.ini"
+        settings_file = Config.SETTINGS_DIR + "settings.ini"
         section = "settings"
 
         if not os.path.exists(settings_file):
@@ -218,40 +218,41 @@ class UiForm:
             if not os.path.exists(directory):
                 os.makedirs(directory)
 
-        config = configparser.ConfigParser(strict=False)
+        loaded_config = configparser.ConfigParser(strict=False)
         if not save:
             self.is_loading_settings = True
             try:
-                config.read(settings_file)
+                loaded_config.read(settings_file)
             except configparser.MissingSectionHeaderError:
                 pass
 
-            self.sync = config.getboolean(section, "syncedlyrics", fallback=False)
-            self.ontop = config.getboolean(section, "alwaysontop", fallback=False)
-            self.open_spotify = config.getboolean(section, "openspotify", fallback=False)
-            self.dark_theme = config.getboolean(section, "darktheme", fallback=False)
-            self.info = config.getboolean(section, "info", fallback=False)
-            self.minimize_to_tray = config.getboolean(section, "minimizetotray", fallback=False)
-            self.font_size_box.setValue(config.getint(section, "fontsize", fallback=10))
+            self.sync = loaded_config.getboolean(section, "syncedlyrics", fallback=False)
+            self.ontop = loaded_config.getboolean(section, "alwaysontop", fallback=False)
+            self.open_spotify = loaded_config.getboolean(section, "openspotify", fallback=False)
+            self.dark_theme = loaded_config.getboolean(section, "darktheme", fallback=False)
+            self.info = loaded_config.getboolean(section, "info", fallback=False)
+            self.minimize_to_tray = loaded_config.getboolean(section, "minimizetotray", fallback=False)
+            self.font_size_box.setValue(loaded_config.getint(section, "fontsize", fallback=10))
+            Config.LYRICS_DIR = loaded_config.get(section, "LyricsPath", fallback=Config.LYRICS_DIR)
 
-            streaming_service_name = config.get(section, "StreamingService", fallback=None)
+            streaming_service_name = loaded_config.get(section, "StreamingService", fallback=None)
             if streaming_service_name:
                 for i in range(len(self.streaming_services)):
                     if str(self.streaming_services[i]) == streaming_service_name:
                         self.streaming_services_box.setCurrentIndex(i)
                         break
 
-            FORM.move(config.getint(section, "X", fallback=FORM.pos().x()),
-                      config.getint(section, "Y", fallback=FORM.pos().y()))
-            if config.getboolean(section, "FullScreen", fallback=False):
+            FORM.move(loaded_config.getint(section, "X", fallback=FORM.pos().x()),
+                      loaded_config.getint(section, "Y", fallback=FORM.pos().y()))
+            if loaded_config.getboolean(section, "FullScreen", fallback=False):
                 FORM.showFullScreen()
-            elif config.getboolean(section, "Maximized", fallback=False):
+            elif loaded_config.getboolean(section, "Maximized", fallback=False):
                 FORM.showMaximized()
             else:
-                FORM.resize(config.getint(section, "Width", fallback=FORM.width().real),
-                            config.getint(section, "Height", fallback=FORM.height().real))
+                FORM.resize(loaded_config.getint(section, "Width", fallback=FORM.width().real),
+                            loaded_config.getint(section, "Height", fallback=FORM.height().real))
 
-            if config.getboolean(section, "disableErrorReporting", fallback=False):
+            if loaded_config.getboolean(section, "disableErrorReporting", fallback=False):
                 self.disableErrorReporting = True
                 sentry_sdk.init()
                 self.options_combobox.setItemText(8, "Error reporting disabled")
@@ -274,25 +275,28 @@ class UiForm:
             if self.minimize_to_tray:
                 self.options_combobox.setItemText(7, "Minimize to Tray (on)")
         else:
-            config.add_section(section)
-            config[section]["SyncedLyrics"] = str(self.sync)
-            config[section]["AlwaysOnTop"] = str(self.ontop)
-            config[section]["OpenSpotify"] = str(self.open_spotify)
-            config[section]["DarkTheme"] = str(self.dark_theme)
-            config[section]["Info"] = str(self.info)
-            config[section]["MinimizeToTray"] = str(self.minimize_to_tray)
-            config[section]["FontSize"] = str(self.font_size_box.value())
-            config[section]["StreamingService"] = str(self.get_current_streaming_service())
-            config[section]["FullScreen"] = str(FORM.isFullScreen())
-            config[section]["Maximized"] = str(FORM.isMaximized())
-            config[section]["X"] = str(FORM.pos().x())
-            config[section]["Y"] = str(FORM.pos().y())
-            config[section]["Width"] = str(FORM.width().real)
-            config[section]["Height"] = str(FORM.height().real)
-            config[section]["disableErrorReporting"] = str(self.disableErrorReporting)
+            loaded_config.add_section(section)
+            loaded_config[section]["SyncedLyrics"] = str(self.sync)
+            loaded_config[section]["AlwaysOnTop"] = str(self.ontop)
+            loaded_config[section]["OpenSpotify"] = str(self.open_spotify)
+            loaded_config[section]["DarkTheme"] = str(self.dark_theme)
+            loaded_config[section]["Info"] = str(self.info)
+            loaded_config[section]["MinimizeToTray"] = str(self.minimize_to_tray)
+            loaded_config[section]["FontSize"] = str(self.font_size_box.value())
+            loaded_config[section]["StreamingService"] = str(self.get_current_streaming_service())
+            loaded_config[section]["FullScreen"] = str(FORM.isFullScreen())
+            loaded_config[section]["Maximized"] = str(FORM.isMaximized())
+            loaded_config[section]["X"] = str(FORM.pos().x())
+            loaded_config[section]["Y"] = str(FORM.pos().y())
+            loaded_config[section]["Width"] = str(FORM.width().real)
+            loaded_config[section]["Height"] = str(FORM.height().real)
+            if self.disableErrorReporting:
+                loaded_config[section]["disableErrorReporting"] = str(self.disableErrorReporting)
+            if Config.LYRICS_DIR != Config.DEFAULT_LYRICS_DIR:
+                loaded_config[section]["LyricsPath"] = Config.LYRICS_DIR
 
             with open(settings_file, 'w+') as settings:
-                config.write(settings)
+                loaded_config.write(settings)
         self.is_loading_settings = False
 
     def options_changed(self) -> None:
@@ -351,7 +355,7 @@ class UiForm:
             self.info = not self.info
         elif current_index == 6:
             if os.name == "nt":
-                subprocess.Popen(r'explorer "' + LYRICS_DIR + '"')
+                subprocess.Popen(r'explorer "' + Config.LYRICS_DIR + '"')
         elif current_index == 7:
             if self.minimize_to_tray:
                 self.options_combobox.setItemText(7, "Minimize to System Tray")
@@ -370,8 +374,8 @@ class UiForm:
 
     def set_style(self):
         self.lyrics_text_align = QtCore.Qt.AlignLeft
-        if os.path.exists(SETTINGS_DIR + "theme.ini"):
-            theme_file = SETTINGS_DIR + "theme.ini"
+        if os.path.exists(Config.SETTINGS_DIR + "theme.ini"):
+            theme_file = Config.SETTINGS_DIR + "theme.ini"
         else:
             theme_file = "theme.ini"
 
@@ -380,35 +384,35 @@ class UiForm:
             return
 
         section = "theme"
-        config = configparser.ConfigParser()
+        style = configparser.ConfigParser()
 
         with open(theme_file, 'r') as theme:
-            config.read_string("[%s]\n%s" % (section, theme.read()))
+            style.read_string("[%s]\n%s" % (section, theme.read()))
 
-        align = config.get(section, "lyricstextalign", fallback="")
+        align = style.get(section, "lyricstextalign", fallback="")
         if align:
             if align == "center":
                 self.lyrics_text_align = QtCore.Qt.AlignCenter
             elif align == "right":
                 self.lyrics_text_align = QtCore.Qt.AlignRight
 
-        FORM.setWindowOpacity(config.getfloat(section, "windowopacity", fallback=1))
+        FORM.setWindowOpacity(style.getfloat(section, "windowopacity", fallback=1))
 
-        background = config.get(section, "backgroundcolor", fallback="")
+        background = style.get(section, "backgroundcolor", fallback="")
         if background:
             FORM.setStyleSheet("background-color: %s;" % background)
 
         style = self.text_browser.styleSheet()
 
-        text_background = config.get(section, "lyricsbackgroundcolor", fallback="")
+        text_background = style.get(section, "lyricsbackgroundcolor", fallback="")
         if text_background:
             style = style + "background-color: %s;" % text_background
 
-        text_color = config.get(section, "lyricstextcolor", fallback="")
+        text_color = style.get(section, "lyricstextcolor", fallback="")
         if text_color:
             style = style + "color: %s;" % text_color
 
-        text_font = config.get(section, "lyricsfont", fallback="")
+        text_font = style.get(section, "lyricsfont", fallback="")
         if text_font:
             style = style + "font-family: %s;" % text_font
 
@@ -416,13 +420,13 @@ class UiForm:
 
         style = self.label_song_name.styleSheet()
 
-        label_color = config.get(section, "songnamecolor", fallback="")
+        label_color = style.get(section, "songnamecolor", fallback="")
         if label_color:
             style = style + "color: %s;" % label_color
             text = re.sub("color:.*?;", "color: %s;" % label_color, self.label_song_name.text())
             self.label_song_name.setText(text)
 
-        label_underline = config.getboolean(section, "songnameunderline", fallback=False)
+        label_underline = style.getboolean(section, "songnameunderline", fallback=False)
         if label_underline:
             style = style + "text-decoration: underline;"
 
@@ -430,11 +434,11 @@ class UiForm:
 
         style = self.font_size_box.styleSheet()
 
-        font_size_background = config.get(section, "fontboxbackgroundcolor", fallback="")
+        font_size_background = style.get(section, "fontboxbackgroundcolor", fallback="")
         if font_size_background:
             style = style + "background-color: %s;" % font_size_background
 
-        font_size_color = config.get(section, "fontboxtextcolor", fallback="")
+        font_size_color = style.get(section, "fontboxtextcolor", fallback="")
         if font_size_color:
             style = style + "color: %s;" % font_size_color
 
@@ -694,16 +698,16 @@ class UiForm:
         if not self.song or not self.lyrics:
             return
 
-        if not os.path.exists(LYRICS_DIR):
-            os.makedirs(LYRICS_DIR)
+        if not os.path.exists(Config.LYRICS_DIR):
+            os.makedirs(Config.LYRICS_DIR)
 
         artist = pathvalidate.sanitize_filename(self.song.artist)
         name = pathvalidate.sanitize_filename(self.song.name)
 
         new_lyrics_file = None
 
-        for lyrics_file in os.listdir(LYRICS_DIR):
-            lyrics_file = os.path.join(LYRICS_DIR, lyrics_file)
+        for lyrics_file in os.listdir(Config.LYRICS_DIR):
+            lyrics_file = os.path.join(Config.LYRICS_DIR, lyrics_file)
             if os.path.isfile(lyrics_file):
                 file_parts = os.path.splitext(lyrics_file)
                 file_extension = file_parts[1].lower()
@@ -728,7 +732,7 @@ class UiForm:
                             return
 
         if not new_lyrics_file:
-            new_lyrics_file = os.path.join(LYRICS_DIR, "%s - %s" % (artist, name))
+            new_lyrics_file = os.path.join(Config.LYRICS_DIR, "%s - %s" % (artist, name))
 
         text = self.lyrics
         if self.timed:

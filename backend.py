@@ -16,7 +16,7 @@ from diskcache import Cache
 
 import services as s
 
-cache = Cache(os.path.join(s.SETTINGS_DIR, 'cache'))
+cache = Cache(os.path.join(s.Config.SETTINGS_DIR, 'cache'))
 
 if sys.platform == "win32":
     import win32process
@@ -212,7 +212,7 @@ def cache_lyrics(func):
             except ValueError:
                 recreate_cache()
                 lyrics_metadata = None
-            if not lyrics_metadata or lyrics_metadata.lyrics == s.ERROR:
+            if not lyrics_metadata or lyrics_metadata.lyrics == s.Config.ERROR:
                 lyrics_metadata = func(*args, **kwargs)
                 try:
                     cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
@@ -240,7 +240,7 @@ def load_lyrics(song: Song, **kwargs):
             SERVICES_LIST2.insert(0, s._local)
 
     timed = False
-    lyrics = s.ERROR
+    lyrics = s.Config.ERROR
     if not CURRENT_SERVICE < (len(SERVICES_LIST1) + len(SERVICES_LIST2) - 1):
         CURRENT_SERVICE = -1
 
@@ -248,26 +248,26 @@ def load_lyrics(song: Song, **kwargs):
         temp_lyrics = []
         for i in range(CURRENT_SERVICE + 1, len(SERVICES_LIST1)):
             lyrics, url, service_name, timed = SERVICES_LIST1[i](song)
-            if lyrics != s.ERROR:
+            if lyrics != s.Config.ERROR:
                 CURRENT_SERVICE = i
                 if timed:
                     break
                 else:
                     temp_lyrics = lyrics, url, service_name, timed
-        if not timed and temp_lyrics and temp_lyrics[0] != s.ERROR:
+        if not timed and temp_lyrics and temp_lyrics[0] != s.Config.ERROR:
             lyrics, url, service_name, timed = temp_lyrics
 
     current_not_synced_service = CURRENT_SERVICE - len(SERVICES_LIST1)
     current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
-    if sync and lyrics == s.ERROR or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
+    if sync and lyrics == s.Config.ERROR or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
         for i in range(current_not_synced_service + 1, len(SERVICES_LIST2)):
             result = SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
             lyrics, url, service_name = result[0], result[1], result[2]
-            if lyrics != s.ERROR:
+            if lyrics != s.Config.ERROR:
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
                 CURRENT_SERVICE = i + len(SERVICES_LIST1)
                 break
-    if lyrics == s.ERROR:
+    if lyrics == s.Config.ERROR:
         service_name = "---"
 
     # return "Error: Could not find lyrics."  if the for loop doesn't find any lyrics
