@@ -360,6 +360,9 @@ def _azapi(song):
     service = "Azapi"
     api = azapi.AZlyrics('duckduckgo', accuracy=0.5)
 
+    if not song.artist:
+        return Config.ERROR, "", service
+
     api.artist = song.artist
     api.title = song.name
 
