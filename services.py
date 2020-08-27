@@ -418,7 +418,11 @@ def _cifraclub(song):
     title = unidecode.unidecode(song.name)
     url = 'https://www.cifraclub.com.br/{}/{}'.format(artist.replace(" ", "-").lower(), title.replace(" ", "-").lower())
 
-    result = requests.get(url, proxies=Config.PROXY)
+    try:
+        result = requests.get(url, proxies=Config.PROXY)
+    except Exception as error:
+        print("cifraclub: %s" % error)
+        return []
 
     if result.status_code == 200:
         return [result.url]
