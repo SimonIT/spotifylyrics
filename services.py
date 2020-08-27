@@ -358,7 +358,7 @@ def _versuri(song):
 
 def _azapi(song):
     service = "Azapi"
-    api = azapi.AZlyrics('duckduckgo', accuracy=0.5)
+    api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
 
     if not song.artist:
         return Config.ERROR, "", service
