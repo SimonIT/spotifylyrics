@@ -10,8 +10,6 @@ import unidecode  # to remove accents
 from azapi import azapi
 from bs4 import BeautifulSoup
 
-import lyrics as minilyrics
-
 try:
     import spotify_lyric.crawlers.QQCrawler as QQCrawler
     import spotify_lyric.model_traditional_conversion.langconv as langconv
@@ -53,30 +51,6 @@ def _local(song):
                         timed = file_extension == ".lrc"
                         url = "file:///" + os.path.abspath(file)
                         break
-
-    return lyrics, url, service_name, timed
-
-
-def _minilyrics(song):
-    service_name = "Mini Lyrics"
-    url = ""
-    timed = False
-    try:
-        data = minilyrics.MiniLyrics(song.artist, song.name)
-        for item in data:
-            if item['url'].endswith(".lrc"):
-                url = item['url']
-                break
-        lyrics = requests.get(url, proxies=Config.PROXY).text
-        timed = True
-    except Exception as error:
-        print("%s: %s" % (service_name, error))
-        lyrics = Config.ERROR
-    if url == "":
-        lyrics = Config.ERROR
-    if song.artist.lower().replace(" ", "") not in lyrics.lower().replace(" ", ""):
-        lyrics = Config.ERROR
-        timed = False
 
     return lyrics, url, service_name, timed
 
@@ -165,24 +139,6 @@ def _qq(song):
         lrc_string += "]".join(line_text[:-1]) + langconv.Converter('zh-hant').convert(line_text)
 
     return lrc_string, url, qq.name, True
-
-
-def _wikia(song):
-    service_name = "Wikia"
-    url = ""
-    timed = False
-    try:
-        lyrics, url, timed = minilyrics.LyricWikia(song.artist, song.name)
-    except Exception as error:
-        print("%s: %s" % (service_name, error))
-        lyrics = Config.ERROR
-    if "TrebleClef.png" in lyrics:
-        lyrics = "(Instrumental)"
-    if "Instrumental" in lyrics:
-        lyrics = "(Instrumental)"
-    if lyrics == "error":
-        lyrics = Config.ERROR
-    return lyrics, url, service_name, timed
 
 
 def _syair(song):
