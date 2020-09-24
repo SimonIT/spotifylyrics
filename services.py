@@ -314,26 +314,31 @@ def _versuri(song):
 
 def _azapi(song):
     service = "Azapi"
-    api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
 
-    if not song.artist:
-        return Config.ERROR, "", service
+    try:
+        api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
 
-    api.artist = song.artist
-    api.title = song.name
+        if not song.artist:
+            return Config.ERROR, "", service
 
-    songs = api.getSongs()
+        api.artist = song.artist
+        api.title = song.name
 
-    if song.name in songs:
-        result_song = songs[song.name]
-    else:
-        return Config.ERROR, "", service
+        songs = api.getSongs()
 
-    song.album = result_song["album"]
-    if result_song["year"]:
-        song.year = int(result_song["year"])
+        if song.name in songs:
+            result_song = songs[song.name]
+        else:
+            return Config.ERROR, "", service
 
-    lyrics = api.getLyrics(url=result_song["url"])
+        song.album = result_song["album"]
+        if result_song["year"]:
+            song.year = int(result_song["year"])
+
+        lyrics = api.getLyrics(url=result_song["url"])
+    except ConnectionError:
+        lyrics = None
+
     if not isinstance(lyrics, str):
         return Config.ERROR, "", service
 
