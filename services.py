@@ -316,7 +316,10 @@ def _azapi(song):
     service = "Azapi"
 
     try:
-        api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
+        try:
+            api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
+        except ConnectionError:
+            api = azapi.AZlyrics('google', accuracy=0.5, proxies=Config.PROXY)
 
         if not song.artist:
             return Config.ERROR, "", service
