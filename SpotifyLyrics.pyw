@@ -384,35 +384,35 @@ class UiForm:
             return
 
         section = "theme"
-        style = configparser.ConfigParser()
+        style_config = configparser.ConfigParser()
 
         with open(theme_file, 'r') as theme:
-            style.read_string("[%s]\n%s" % (section, theme.read()))
+            style_config.read_string("[%s]\n%s" % (section, theme.read()))
 
-        align = style.get(section, "lyricstextalign", fallback="")
+        align = style_config.get(section, "lyricstextalign", fallback="")
         if align:
             if align == "center":
                 self.lyrics_text_align = QtCore.Qt.AlignCenter
             elif align == "right":
                 self.lyrics_text_align = QtCore.Qt.AlignRight
 
-        FORM.setWindowOpacity(style.getfloat(section, "windowopacity", fallback=1))
+        FORM.setWindowOpacity(style_config.getfloat(section, "windowopacity", fallback=1))
 
-        background = style.get(section, "backgroundcolor", fallback="")
+        background = style_config.get(section, "backgroundcolor", fallback="")
         if background:
             FORM.setStyleSheet("background-color: %s;" % background)
 
         style = self.text_browser.styleSheet()
 
-        text_background = style.get(section, "lyricsbackgroundcolor", fallback="")
+        text_background = style_config.get(section, "lyricsbackgroundcolor", fallback="")
         if text_background:
             style = style + "background-color: %s;" % text_background
 
-        text_color = style.get(section, "lyricstextcolor", fallback="")
+        text_color = style_config.get(section, "lyricstextcolor", fallback="")
         if text_color:
             style = style + "color: %s;" % text_color
 
-        text_font = style.get(section, "lyricsfont", fallback="")
+        text_font = style_config.get(section, "lyricsfont", fallback="")
         if text_font:
             style = style + "font-family: %s;" % text_font
 
@@ -420,13 +420,13 @@ class UiForm:
 
         style = self.label_song_name.styleSheet()
 
-        label_color = style.get(section, "songnamecolor", fallback="")
+        label_color = style_config.get(section, "songnamecolor", fallback="")
         if label_color:
             style = style + "color: %s;" % label_color
             text = re.sub("color:.*?;", "color: %s;" % label_color, self.label_song_name.text())
             self.label_song_name.setText(text)
 
-        label_underline = style.getboolean(section, "songnameunderline", fallback=False)
+        label_underline = style_config.getboolean(section, "songnameunderline", fallback=False)
         if label_underline:
             style = style + "text-decoration: underline;"
 
@@ -434,11 +434,11 @@ class UiForm:
 
         style = self.font_size_box.styleSheet()
 
-        font_size_background = style.get(section, "fontboxbackgroundcolor", fallback="")
+        font_size_background = style_config.get(section, "fontboxbackgroundcolor", fallback="")
         if font_size_background:
             style = style + "background-color: %s;" % font_size_background
 
-        font_size_color = style.get(section, "fontboxtextcolor", fallback="")
+        font_size_color = style_config.get(section, "fontboxtextcolor", fallback="")
         if font_size_color:
             style = style + "color: %s;" % font_size_color
 
