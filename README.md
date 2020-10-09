@@ -6,6 +6,27 @@
 
 Fetches and displays lyrics to currently playing song in the Spotify desktop client.
 
+
+The lyrics are fetched from these sites:
+
+rentanadviser.com (synchronized)
+
+megalobiz.com (synchronized)
+
+syair.info (synchronized)
+
+musixmatch.com
+
+songmeanings.com
+
+songlyrics.com
+
+genius.com
+
+versuri.ro
+
+AZLyrics.com
+
 # How to
 
 You can grab the latest release in the [release section](https://github.com/SimonIT/spotifylyrics/releases).
