@@ -186,19 +186,30 @@ def _musixmatch(song):
     service_name = "Musixmatch"
     url = ""
     lyrics = Config.ERROR
+
+    def extract_mxm_props(soup_page):
+        scripts = soup_page.find_all("script")
+        props_script = None
+        for script in scripts:
+            if script.contents and "__mxmProps" in script.contents[0]:
+                props_script = script
+                break
+        return props_script.contents[0]
+
     try:
         search_url = "https://www.musixmatch.com/search/%s-%s/tracks" % (
             song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
         header = {"User-Agent": "curl/7.9.8 (i686-pc-linux-gnu) libcurl 7.9.8 (OpenSSL 0.9.6b) (ipv6 enabled)"}
         search_results = requests.get(search_url, headers=header, proxies=Config.PROXY)
         soup = BeautifulSoup(search_results.text, 'html.parser')
-        page = re.findall('"track_share_url":"([^"]*)', soup.text)
+        page = re.findall('"track_share_url":"([^"]*)', extract_mxm_props(soup))
         if page:
             url = codecs.decode(page[0], 'unicode-escape')
             lyrics_page = requests.get(url, headers=header, proxies=Config.PROXY)
             soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-            if '"body":"' in soup.text:
-                lyrics = soup.text.split('"body":"')[1].split('","language"')[0]
+            props = extract_mxm_props(soup)
+            if '"body":"' in props:
+                lyrics = props.split('"body":"')[1].split('","language"')[0]
                 lyrics = lyrics.replace("\\n", "\n")
                 lyrics = lyrics.replace("\\", "")
                 if lyrics.strip() == "":
