@@ -191,7 +191,7 @@ def _musixmatch(song):
         scripts = soup_page.find_all("script")
         props_script = None
         for script in scripts:
-            if script.contents and "__mxmProps" in script.contents[0]:
+            if script and script.contents and "__mxmProps" in script.contents[0]:
                 props_script = script
                 break
         return props_script.contents[0]
@@ -212,7 +212,7 @@ def _musixmatch(song):
                 lyrics = props.split('"body":"')[1].split('","language"')[0]
                 lyrics = lyrics.replace("\\n", "\n")
                 lyrics = lyrics.replace("\\", "")
-                if lyrics.strip() == "":
+                if not lyrics.strip():
                     lyrics = Config.ERROR
                 album = soup.find(class_="mxm-track-footer__album")
                 if album:
