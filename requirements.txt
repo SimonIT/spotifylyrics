@@ -14,3 +14,4 @@ pathvalidate
 diskcache
 sentry-sdk
 azapi>=3.0.1
+pyinstaller # Only for deployment

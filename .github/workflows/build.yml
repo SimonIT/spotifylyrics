@@ -1,0 +1,81 @@
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Setup PYTHONPATH
+        run: echo "PYTHONPATH=$PYTHONPATH:$PWD:$PWD/spotify_lyric" >> $GITHUB_ENV
+      - name: Run test
+        working-directory: tests
+        run: python -m unittest discover . "*_test.py"
+      - name: Build .app
+        run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.icns --add-data "icon.png:."
+      - name: Upload .app
+        uses: actions/upload-artifact@v2.1.4
+        with:
+          name: macos
+          path: dist/SpotifyLyrics.app
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Setup PYTHONPATH
+        run: echo "PYTHONPATH=$PYTHONPATH:$PWD:$PWD/spotify_lyric" >> $GITHUB_ENV
+      - name: Run test
+        working-directory: tests
+        run: python -m unittest discover . "*_test.py"
+      - name: Build executable
+        run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.ico --add-data "icon.png:."
+      - name: Upload executable
+        uses: actions/upload-artifact@v2.1.4
+        with:
+          name: linux
+          path: dist/SpotifyLyrics
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Setup PYTHONPATH
+        run: echo "PYTHONPATH=$PYTHONPATH:$PWD:$PWD/spotify_lyric" >> $GITHUB_ENV
+      - name: Run test
+        working-directory: tests
+        run: python -m unittest discover . "*_test.py"
+      - name: Build .exe
+        run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.ico --add-data "icon.png;."
+      - name: Upload .exe
+        uses: actions/upload-artifact@v2.1.4
+        with:
+          name: windows
+          path: dist/SpotifyLyrics.exe
