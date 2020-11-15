@@ -41,6 +41,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.7
+      - name: Install dbus
+        run: sudo apt install libdbus-1-dev libdbus-glib-1-dev --yes
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Setup PYTHONPATH
@@ -68,7 +70,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Setup PYTHONPATH
-        run: echo "PYTHONPATH=$PYTHONPATH:$PWD:$PWD/spotify_lyric" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=${env:GITHUB_WORKSPACE};${env:GITHUB_WORKSPACE};${env:GITHUB_WORKSPACE}/spotify_lyric" >> $GITHUB_ENV
       - name: Run test
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
