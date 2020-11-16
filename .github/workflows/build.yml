@@ -70,7 +70,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Setup PYTHONPATH
-        run: echo "PYTHONPATH=${env:GITHUB_WORKSPACE};${env:GITHUB_WORKSPACE};${env:GITHUB_WORKSPACE}/spotify_lyric" >> $GITHUB_ENV
+        run: echo "PYTHONPATH=${env:PYTHONPATH};${env:GITHUB_WORKSPACE};${env:GITHUB_WORKSPACE}/spotify_lyric" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf-8 -Append
       - name: Run test
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
