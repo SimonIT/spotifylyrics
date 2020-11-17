@@ -14,8 +14,6 @@ class LyricsTest(unittest.TestCase):
     ]
 
     services_to_test = [
-        services._minilyrics,
-        services._wikia,
         services._musixmatch,
         services._songmeanings,
         services._songlyrics,

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -15,7 +16,7 @@ from diskcache import Cache
 
 import services as s
 
-cache = Cache(os.path.join(s.SETTINGS_DIR, 'cache'))
+cache = Cache(os.path.join(s.Config.SETTINGS_DIR, 'cache'))
 
 if sys.platform == "win32":
     import win32process
@@ -46,11 +47,15 @@ class Song:
     @classmethod
     def get_from_string(cls, songstring: str):
         song_name_parts = songstring.split(" - ")
-        artist = song_name_parts[0]
+        artist = ""
         if len(song_name_parts) > 2:
+            artist = song_name_parts[0]
             name = " - ".join(song_name_parts[1:-1])
-        else:
+        elif len(song_name_parts) == 2:
+            artist = song_name_parts[0]
             name = song_name_parts[1]
+        else:
+            name = song_name_parts[0]
         name = re.sub(r' \(.*?\)', '', name, flags=re.DOTALL)
         name = re.sub(r' \[.*?\]', '', name, flags=re.DOTALL)
         return cls(artist, name)
@@ -109,7 +114,7 @@ class SpotifyStreamingService(StreamingService):
         return "Spotify"
 
     def get_not_playing_windows_title(self) -> Tuple:
-        return 'Spotify', 'Spotify Free', 'Spotify Premium', 'Drag', ''
+        return 'Spotify', 'Spotify Free', 'Spotify Premium', 'Drag', 'Advertisement', ''
 
     def __str__(self):
         return "Spotify"
@@ -167,11 +172,11 @@ class VlcMediaPlayer(StreamingService):
         return "VLC"
 
 
-# With Sync.
-SERVICES_LIST1 = [s._minilyrics, s._qq, s._rentanadviser, s._syair, s._megalobiz, s._wikia]
+# With Sync. Not working: s._minilyrics, s._qq
+SERVICES_LIST1 = [s._rentanadviser, s._syair, s._megalobiz]
 
 # Without Sync.
-SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri]
+SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri, s._azapi]
 
 # Accords
 SERVICES_LIST3 = [s._ultimateguitar, s._cifraclub, s._songsterr]
@@ -187,6 +192,14 @@ LyricsMetadata = namedtuple("LyricsMetadata", ["lyrics", "url", "service_name", 
 
 
 def cache_lyrics(func):
+    def recreate_cache():
+        global cache
+        cache_dir = cache.directory
+        cache.close()
+        shutil.rmtree(cache_dir)
+        cache = Cache(cache_dir)
+        print("Cache recreated")
+
     def wrapper(*args, **kwargs):
         song = args[0]
         sync = kwargs.get("sync", False)
@@ -194,10 +207,17 @@ def cache_lyrics(func):
 
         clean_song_name = '{}-{}'.format(song.artist, song.name)
         if not ignore_cache:
-            lyrics_metadata = cache.get(clean_song_name)
-            if not lyrics_metadata:
+            try:
+                lyrics_metadata = cache.get(clean_song_name)
+            except ValueError:
+                recreate_cache()
+                lyrics_metadata = None
+            if not lyrics_metadata or lyrics_metadata.lyrics == s.Config.ERROR:
                 lyrics_metadata = func(*args, **kwargs)
-                cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
+                try:
+                    cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
+                except ValueError:
+                    recreate_cache()
             return lyrics_metadata
         else:
             lyrics_metadata = func(*args, **kwargs)
@@ -220,7 +240,7 @@ def load_lyrics(song: Song, **kwargs):
             SERVICES_LIST2.insert(0, s._local)
 
     timed = False
-    lyrics = s.ERROR
+    lyrics = s.Config.ERROR
     if not CURRENT_SERVICE < (len(SERVICES_LIST1) + len(SERVICES_LIST2) - 1):
         CURRENT_SERVICE = -1
 
@@ -228,26 +248,26 @@ def load_lyrics(song: Song, **kwargs):
         temp_lyrics = []
         for i in range(CURRENT_SERVICE + 1, len(SERVICES_LIST1)):
             lyrics, url, service_name, timed = SERVICES_LIST1[i](song)
-            if lyrics != s.ERROR:
+            if lyrics != s.Config.ERROR:
                 CURRENT_SERVICE = i
                 if timed:
                     break
                 else:
                     temp_lyrics = lyrics, url, service_name, timed
-        if not timed and temp_lyrics and temp_lyrics[0] != s.ERROR:
+        if not timed and temp_lyrics and temp_lyrics[0] != s.Config.ERROR:
             lyrics, url, service_name, timed = temp_lyrics
 
     current_not_synced_service = CURRENT_SERVICE - len(SERVICES_LIST1)
     current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
-    if sync and lyrics == s.ERROR or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
+    if sync and lyrics == s.Config.ERROR or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
         for i in range(current_not_synced_service + 1, len(SERVICES_LIST2)):
             result = SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
             lyrics, url, service_name = result[0], result[1], result[2]
-            if lyrics != s.ERROR:
+            if lyrics != s.Config.ERROR:
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
                 CURRENT_SERVICE = i + len(SERVICES_LIST1)
                 break
-    if lyrics == s.ERROR:
+    if lyrics == s.Config.ERROR:
         service_name = "---"
 
     # return "Error: Could not find lyrics."  if the for loop doesn't find any lyrics
@@ -293,6 +313,8 @@ def update_spids(windows_executable: str):
                 spids.append(proc.pid)
         except psutil.NoSuchProcess:
             print("Process does not exist anymore")
+        except psutil.AccessDenied:
+            print("Cannot access the name of the process")
 
 
 def get_window_title(service: StreamingService) -> str:
@@ -375,19 +397,23 @@ def check_version() -> bool:
 
 
 def get_version() -> float:
-    return 1.52
+    return 1.55
 
 
-def open_spotify(service: StreamingService):
+def open_spotify(service: StreamingService) -> bool:
     if sys.platform == "win32":
         if not get_window_title(service):
-            subprocess.Popen(service.get_windows_exe_path())
+            try:
+                subprocess.Popen(service.get_windows_exe_path())
+            except FileNotFoundError:
+                return False
     elif sys.platform == "linux":
         if not get_window_title(service):
             subprocess.Popen(service.get_linux_open_command())
     elif sys.platform == "darwin":
         if not get_window_title(service):
             subprocess.call(["open", "-a", service.get_apple_open_command()])
+    return True
 
 
 def main():
