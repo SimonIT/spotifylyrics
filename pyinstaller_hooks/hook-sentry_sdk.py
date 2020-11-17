@@ -6,4 +6,5 @@ hiddenimports = ["sentry_sdk.integrations.stdlib",
                  "sentry_sdk.integrations.argv",
                  "sentry_sdk.integrations.logging",
                  "sentry_sdk.integrations.threading",
-                 "sentry_sdk.integrations.django"]
+                 "sentry_sdk.integrations.django",
+                 "sentry_sdk.integrations.flask"]
