@@ -21,7 +21,7 @@ jobs:
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
       - name: Build .app
-        run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.icns --add-data "icon.png:."
+        run: pyinstaller SpotifyLyrics.py -F -i icon.icns --add-data "icon.png:."
       - name: Upload .app
         uses: actions/upload-artifact@v2.1.4
         with:
@@ -47,7 +47,7 @@ jobs:
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
       - name: Build executable
-        run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.ico --add-data "icon.png:."
+        run: pyinstaller SpotifyLyrics.py -F -i icon.ico --add-data "icon.png:."
       - name: Upload executable
         uses: actions/upload-artifact@v2.1.4
         with:
