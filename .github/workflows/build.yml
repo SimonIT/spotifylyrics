@@ -1,10 +1,6 @@
 name: Build
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [push, pull_request]
 
 jobs:
   macos:
@@ -75,7 +71,7 @@ jobs:
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
       - name: Build .exe
-        run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.ico --add-data "icon.png;."
+        run: pyinstaller SpotifyLyrics.py -F -i icon.ico --add-data "icon.png;."
       - name: Upload .exe
         uses: actions/upload-artifact@v2.1.4
         with:
