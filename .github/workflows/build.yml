@@ -21,7 +21,7 @@ jobs:
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
       - name: Build .app
-        run: pyinstaller SpotifyLyrics.py -F -i icon.icns --add-data "icon.png:."
+        run: pyinstaller SpotifyLyrics.py -F -i icon.icns --add-data "icon.png:." --additional-hooks-dir=pyinstaller_hooks
       - name: Upload .app
         uses: actions/upload-artifact@v2.1.4
         with:
@@ -47,7 +47,7 @@ jobs:
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
       - name: Build executable
-        run: pyinstaller SpotifyLyrics.py -F -i icon.ico --add-data "icon.png:."
+        run: pyinstaller SpotifyLyrics.py -F -i icon.ico --add-data "icon.png:." --additional-hooks-dir=pyinstaller_hooks
       - name: Upload executable
         uses: actions/upload-artifact@v2.1.4
         with:
@@ -66,12 +66,12 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Setup PYTHONPATH
-        run: echo "PYTHONPATH=${env:PYTHONPATH};${env:GITHUB_WORKSPACE};${env:GITHUB_WORKSPACE}/spotify_lyric" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf-8 -Append
+        run: echo "PYTHONPATH=${env:PYTHONPATH};${env:GITHUB_WORKSPACE};${env:GITHUB_WORKSPACE}\spotify_lyric" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf-8 -Append
       - name: Run test
         working-directory: tests
         run: python -m unittest discover . "*_test.py"
       - name: Build .exe
-        run: pyinstaller SpotifyLyrics.py -F -i icon.ico --add-data "icon.png;."
+        run: pyinstaller SpotifyLyrics.py -F -i icon.ico --add-data "icon.png;." --additional-hooks-dir=pyinstaller_hooks
       - name: Upload .exe
         uses: actions/upload-artifact@v2.1.4
         with:
