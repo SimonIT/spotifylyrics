@@ -14,4 +14,4 @@ if hasattr(si, '_AUTO_ENABLING_INTEGRATIONS'):
         return ".".join(integration_name.split(".")[:-1])
 
 
-    hiddenimports.extend(list(map(make_integration_name, si._AUTO_ENABLING_INTEGRATIONS)))
+    hiddenimports.extend(map(make_integration_name, si._AUTO_ENABLING_INTEGRATIONS))
