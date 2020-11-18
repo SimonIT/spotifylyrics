@@ -789,7 +789,7 @@ class FormWidget(QtWidgets.QWidget):
 
 if __name__ == "__main__":
     sentry_sdk.init("https://71bf000cb7c5448c8c08660b29a12c09@o407859.ingest.sentry.io/5277612",
-                    release="spotifylyrics@" + str(backend.get_version()))
+                    release="spotifylyrics@" + str(backend.get_version()), auto_enabling_integrations=False)
     with sentry_sdk.configure_scope() as scope:
         scope.set_user({"username": getpass.getuser()})
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
