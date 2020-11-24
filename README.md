@@ -9,23 +9,15 @@ Fetches and displays lyrics to currently playing song in the Spotify desktop cli
 
 The lyrics are fetched from these sites:
 
-rentanadviser.com (synchronized)
-
-megalobiz.com (synchronized)
-
-syair.info (synchronized)
-
-musixmatch.com
-
-songmeanings.com
-
-songlyrics.com
-
-genius.com
-
-versuri.ro
-
-AZLyrics.com
+- rentanadviser.com (synchronized)
+- megalobiz.com (synchronized)
+- syair.info (synchronized)
+- musixmatch.com
+- songmeanings.com
+- songlyrics.com
+- genius.com
+- versuri.ro
+- AZLyrics.com
 
 # How to
 
