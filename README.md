@@ -57,15 +57,14 @@ Make a right click on the SpotifyLyrics.app. Click on open and and you can bypas
 If you want to run from source you need:
 
 * Python 3.6 (probably any version greater than Python 3.6)
-* pip install -r requirements.txt
+* `pip install -r requirements.txt`
 
 ## Ubuntu/Debian example:
 ```
-sudo apt install python3-pip
+sudo apt install python3-pip git
 git clone https://github.com/SimonIT/spotifylyrics.git
 cd spotifylyrics/
 sudo pip3 install -r requirements.txt
-chmod +x SpotifyLyrics.pyw
 ./SpotifyLyrics.pyw
 ```
 
