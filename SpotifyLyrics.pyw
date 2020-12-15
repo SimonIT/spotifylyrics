@@ -414,7 +414,7 @@ class UiForm:
 
         text_font = style_config.get(section, "lyricsfont", fallback="")
         if text_font:
-            style = style + "font-family: %s;" % text_font
+            style = style + "font-family: \"%s\";" % text_font
 
         self.text_browser.setStyleSheet(style)
 
