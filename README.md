@@ -77,5 +77,11 @@ There you can put `.lrc` files with synced text (You can make them for example o
  
 **Important: The file names must include the artist and the name of the song**
 
+# Theming
+
+You can customize the design of SpotifyLyrics.
+To do so creat a file called _theme.ini_ inside `C:\Users\<User>\AppData\Roaming\SpotifyLyrics\lyrics` or `/home/<User>/.SpotifyLyrics/lyrics`.
+Then put some style information in it. An example yan you find [here](https://github.com/SimonIT/spotifylyrics/blob/master/example-theme.ini).
+
 # Screenshot
 ![example-img](https://i.imgur.com/2dUN17q.png)
