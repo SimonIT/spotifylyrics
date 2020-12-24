@@ -81,7 +81,7 @@ There you can put `.lrc` files with synced text (You can make them for example o
 
 You can customize the design of SpotifyLyrics.
 To do so creat a file called _theme.ini_ inside `C:\Users\<User>\AppData\Roaming\SpotifyLyrics` or `/home/<User>/.SpotifyLyrics`.
-Then put some style information in it. An example yan you find [here](https://github.com/SimonIT/spotifylyrics/blob/master/example-theme.ini).
+Then put some style information in it. You can find an example [here](https://github.com/SimonIT/spotifylyrics/blob/master/example-theme.ini).
 
 # Screenshot
 ![example-img](https://i.imgur.com/2dUN17q.png)
