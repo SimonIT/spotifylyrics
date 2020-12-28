@@ -726,7 +726,7 @@ class UiForm:
 
                         save_anyway = save_dialog.exec()
                         if save_anyway == QMessageBox.Yes:
-                            new_lyrics_file_name = file_name
+                            new_lyrics_file_name = file_parts[0]
                             break
                         else:
                             return
