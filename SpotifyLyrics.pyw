@@ -704,12 +704,12 @@ class UiForm:
         artist = pathvalidate.sanitize_filename(self.song.artist)
         name = pathvalidate.sanitize_filename(self.song.name)
 
-        new_lyrics_file = None
+        new_lyrics_file_name = None
 
-        for lyrics_file in os.listdir(Config.LYRICS_DIR):
-            lyrics_file = os.path.join(Config.LYRICS_DIR, lyrics_file)
-            if os.path.isfile(lyrics_file):
-                file_parts = os.path.splitext(lyrics_file)
+        for lyrics_file_name in os.listdir(Config.LYRICS_DIR):
+            lyrics_file_name = os.path.join(Config.LYRICS_DIR, lyrics_file_name)
+            if os.path.isfile(lyrics_file_name):
+                file_parts = os.path.splitext(lyrics_file_name)
                 file_extension = file_parts[1].lower()
                 if file_extension in (".txt", ".lrc"):
                     file_name = file_parts[0].lower()
@@ -726,25 +726,25 @@ class UiForm:
 
                         save_anyway = save_dialog.exec()
                         if save_anyway == QMessageBox.Yes:
-                            new_lyrics_file = file_name
+                            new_lyrics_file_name = file_name
                             break
                         else:
                             return
 
-        if not new_lyrics_file:
-            new_lyrics_file = os.path.join(Config.LYRICS_DIR, "%s - %s" % (artist, name))
+        if not new_lyrics_file_name:
+            new_lyrics_file_name = os.path.join(Config.LYRICS_DIR, "%s - %s" % (artist, name))
 
         text = self.lyrics
         if self.timed:
-            lyrics_file = new_lyrics_file + ".lrc"
+            lyrics_file_name = new_lyrics_file_name + ".lrc"
             if self.sync_adjustment_slider.value() != 0:
                 lrc = pylrc.parse(text)
                 lrc.offset -= self.sync_adjustment_slider.value() * 1000
                 text = lrc.toLRC()
         else:
-            lyrics_file = new_lyrics_file + ".txt"
+            lyrics_file_name = new_lyrics_file_name + ".txt"
 
-        with open(lyrics_file, "w", encoding="utf-8") as lyrics_file:
+        with open(lyrics_file_name, "w", encoding="utf-8") as lyrics_file:
             lyrics_file.write(text)
 
     def spotify(self) -> None:
