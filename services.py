@@ -29,6 +29,9 @@ class Config:
     LYRICS_DIR = DEFAULT_LYRICS_DIR
 
 
+UA = "Mozilla/5.0 (Maemo; Linux armv7l; rv:10.0.1) Gecko/20100101 Firefox/10.0.1 Fennec/10.0.1"
+
+
 def _local(song):
     service_name = "Local"
     url = ""
@@ -145,27 +148,28 @@ def _syair(song):
     service_name = "Syair"
     url = ""
 
-    search_url = "https://syair.info/search?%s" % parse.urlencode({
+    search_url = "https://www.syair.info/search?%s" % parse.urlencode({
         "q": song.artist + " " + song.name
     })
     try:
-        search_results = requests.get(search_url, proxies=Config.PROXY)
+        search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
         soup = BeautifulSoup(search_results.text, 'html.parser')
 
-        result_container = soup.find("article", class_="sub")
+        result_container = soup.find("div", class_="sub")
 
         if result_container:
-            result_list = result_container.find("div", class_="ul")
+            result_list = result_container.find_all("div", class_="li")
 
             if result_list:
-                for result_link in result_list.find_all("a"):
+                for result in result_list:
+                    result_link = result.find("a")
                     name = result_link.get_text().lower()
                     if song.artist.lower() in name and song.name.lower() in name:
-                        url = "https://syair.info%s" % result_link["href"]
+                        url = "https://www.syair.info%s" % result_link["href"]
                         break
 
                 if url:
-                    lyrics_page = requests.get(url, proxies=Config.PROXY)
+                    lyrics_page = requests.get(url, proxies=Config.PROXY, headers={"User-Agent": UA})
                     soup = BeautifulSoup(lyrics_page.text, 'html.parser')
                     lrc_link = ""
                     for download_link in soup.find_all("a"):
@@ -173,8 +177,8 @@ def _syair(song):
                             lrc_link = download_link["href"]
                             break
                     if lrc_link:
-                        lrc = requests.get("https://syair.info%s" % lrc_link, proxies=Config.PROXY,
-                                           cookies=lyrics_page.cookies).text
+                        lrc = requests.get("https://www.syair.info%s" % lrc_link, proxies=Config.PROXY,
+                                           cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
 
                         return lrc, url, service_name, True
     except Exception as error:
