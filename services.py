@@ -9,7 +9,6 @@ import requests
 import unidecode  # to remove accents
 from azapi import azapi
 from bs4 import BeautifulSoup
-
 try:
     import spotify_lyric.crawlers.QQCrawler as QQCrawler
     import spotify_lyric.model_traditional_conversion.langconv as langconv
@@ -30,6 +29,7 @@ class Config:
 
 
 UA = "Mozilla/5.0 (Maemo; Linux armv7l; rv:10.0.1) Gecko/20100101 Firefox/10.0.1 Fennec/10.0.1"
+
 
 
 def _local(song):
@@ -57,75 +57,6 @@ def _local(song):
 
     return lyrics, url, service_name, timed
 
-
-def _rentanadviser(song):
-    service_name = "RentAnAdviser"
-    url = ""
-
-    search_url = "https://www.rentanadviser.com/en/subtitles/subtitles4songs.aspx?%s" % parse.urlencode({
-        "src": song.artist + " " + song.name
-    })
-    try:
-        search_results = requests.get(search_url, proxies=Config.PROXY)
-        soup = BeautifulSoup(search_results.text, 'html.parser')
-        result_links = soup.find(id="tablecontainer").find_all("a")
-
-        for result_link in result_links:
-            if result_link["href"] != "subtitles4songs.aspx":
-                lower_title = result_link.get_text().lower()
-                if song.artist.lower() in lower_title and song.name.lower() in lower_title:
-                    url = "https://www.rentanadviser.com/en/subtitles/%s&type=lrc" % result_link["href"]
-                    break
-
-        if url:
-            possible_text = requests.get(url, proxies=Config.PROXY)
-            soup = BeautifulSoup(possible_text.text, 'html.parser')
-
-            event_validation = soup.find(id="__EVENTVALIDATION")["value"]
-            view_state = soup.find(id="__VIEWSTATE")["value"]
-
-            lrc = requests.post(url, {"__EVENTTARGET": "ctl00$ContentPlaceHolder1$btnlyrics",
-                                      "__EVENTVALIDATION": event_validation,
-                                      "__VIEWSTATE": view_state}, proxies=Config.PROXY).text
-
-            return lrc, url, service_name, True
-
-    except Exception as error:
-        print("%s: %s" % (service_name, error))
-    return Config.ERROR, url, service_name, False
-
-
-def _megalobiz(song):
-    service_name = "Megalobiz"
-    url = ""
-
-    search_url = "https://www.megalobiz.com/search/all?%s" % parse.urlencode({
-        "qry": song.artist + " " + song.name,
-        "display": "more"
-    })
-    try:
-        search_results = requests.get(search_url, proxies=Config.PROXY)
-        soup = BeautifulSoup(search_results.text, 'html.parser')
-        result_links = soup.find(id="list_entity_container").find_all("a", class_="entity_name")
-
-        for result_link in result_links:
-            lower_title = result_link.get_text().lower()
-            if song.artist.lower() in lower_title and song.name.lower() in lower_title:
-                url = "https://www.megalobiz.com%s" % result_link["href"]
-                break
-
-        if url:
-            possible_text = requests.get(url, proxies=Config.PROXY)
-            soup = BeautifulSoup(possible_text.text, 'html.parser')
-
-            lrc = soup.find("div", class_="lyrics_details").span.get_text()
-
-            return lrc, url, service_name, True
-    except Exception as error:
-        print("%s: %s" % (service_name, error))
-    return Config.ERROR, url, service_name, False
-
-
 def _qq(song):
     url = ""
     try:
@@ -142,49 +73,6 @@ def _qq(song):
         lrc_string += "]".join(line_text[:-1]) + langconv.Converter('zh-hant').convert(line_text)
 
     return lrc_string, url, qq.name, True
-
-
-def _syair(song):
-    service_name = "Syair"
-    url = ""
-
-    search_url = "https://www.syair.info/search?%s" % parse.urlencode({
-        "q": song.artist + " " + song.name
-    })
-    try:
-        search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
-        soup = BeautifulSoup(search_results.text, 'html.parser')
-
-        result_container = soup.find("div", class_="sub")
-
-        if result_container:
-            result_list = result_container.find_all("div", class_="li")
-
-            if result_list:
-                for result in result_list:
-                    result_link = result.find("a")
-                    name = result_link.get_text().lower()
-                    if song.artist.lower() in name and song.name.lower() in name:
-                        url = "https://www.syair.info%s" % result_link["href"]
-                        break
-
-                if url:
-                    lyrics_page = requests.get(url, proxies=Config.PROXY, headers={"User-Agent": UA})
-                    soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-                    lrc_link = ""
-                    for download_link in soup.find_all("a"):
-                        if "download.php" in download_link["href"]:
-                            lrc_link = download_link["href"]
-                            break
-                    if lrc_link:
-                        lrc = requests.get("https://www.syair.info%s" % lrc_link, proxies=Config.PROXY,
-                                           cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
-
-                        return lrc, url, service_name, True
-    except Exception as error:
-        print("%s: %s" % (service_name, error))
-    return Config.ERROR, url, service_name, False
-
 
 def _musixmatch(song):
     service_name = "Musixmatch"
