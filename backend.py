@@ -235,17 +235,17 @@ def cache_lyrics(func):
 
 
 @cache_lyrics
-def load_lyrics(song: Song, **kwargs):
-    sync = kwargs.get("sync", False)
+def load_lyrics(song: Song, sync=False):
     global CURRENT_SERVICE
 
     if sync and s._local not in SYNCED_SERVICES:
         SYNCED_SERVICES.insert(0, s._local)
     elif not sync and s._local not in UNSYNCED_SERVICES:
         UNSYNCED_SERVICES.insert(0, s._local)
+
     timed = False
     lyrics = s.Config.ERROR
-    if not CURRENT_SERVICE < (len(SYNCED_SERVICES) + len(UNSYNCED_SERVICES) - 1):
+    if CURRENT_SERVICE >= (len(SYNCED_SERVICES) + len(UNSYNCED_SERVICES) - 1):
         CURRENT_SERVICE = -1
 
     if sync and CURRENT_SERVICE + 1 < len(SYNCED_SERVICES):
@@ -271,8 +271,7 @@ def load_lyrics(song: Song, **kwargs):
         if temp_lyrics and temp_lyrics[0] != s.Config.ERROR and not timed:
             # If we never found a timed source, set lyrics to fallback
             lyrics, url, service_name, timed = temp_lyrics
-    current_not_synced_service = CURRENT_SERVICE - len(SYNCED_SERVICES)
-    current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
+    current_not_synced_service = max(-1, CURRENT_SERVICE - len(SYNCED_SERVICES))
     if sync and lyrics == s.Config.ERROR or \
         not sync or CURRENT_SERVICE > (len(SYNCED_SERVICES) - 1):
         for i in range(current_not_synced_service + 1, len(UNSYNCED_SERVICES)):
