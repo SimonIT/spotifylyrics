@@ -10,11 +10,12 @@ import webbrowser  # to open link on browser
 from collections import namedtuple
 from typing import Tuple
 from urllib import request
-
+from lrc_kit import ComboLyricProvider, SearchRequest, LRC
 import requests
 from diskcache import Cache
-
 import services as s
+
+
 
 cache = Cache(os.path.join(s.Config.SETTINGS_DIR, 'cache'))
 
@@ -27,6 +28,8 @@ elif sys.platform == "linux":
 elif sys.platform == "darwin":
     import applescript
 
+synced_lyric_provider = ComboLyricProvider()
+SYNCED_SERVICES = synced_lyric_provider.providers
 
 class Song:
     name = ""
@@ -173,8 +176,6 @@ class VlcMediaPlayer(StreamingService):
 
 
 # With Sync. Not working: s._minilyrics, s._qq
-SERVICES_LIST1 = [s._rentanadviser, s._syair, s._megalobiz]
-
 # Without Sync.
 SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri, s._azapi]
 
@@ -232,40 +233,38 @@ def load_lyrics(song: Song, **kwargs):
     sync = kwargs.get("sync", False)
     global CURRENT_SERVICE
 
-    if sync:
-        if s._local not in SERVICES_LIST1:
-            SERVICES_LIST1.insert(0, s._local)
-    else:
-        if s._local not in SERVICES_LIST2:
-            SERVICES_LIST2.insert(0, s._local)
+    if s._local not in SERVICES_LIST2:
+        SERVICES_LIST2.insert(0, s._local)
 
     timed = False
     lyrics = s.Config.ERROR
-    if not CURRENT_SERVICE < (len(SERVICES_LIST1) + len(SERVICES_LIST2) - 1):
+    if not CURRENT_SERVICE < (len(SYNCED_SERVICES) + len(SERVICES_LIST2) - 1):
         CURRENT_SERVICE = -1
 
-    if sync and CURRENT_SERVICE + 1 < len(SERVICES_LIST1):
-        temp_lyrics = []
-        for i in range(CURRENT_SERVICE + 1, len(SERVICES_LIST1)):
-            lyrics, url, service_name, timed = SERVICES_LIST1[i](song)
-            if lyrics != s.Config.ERROR:
-                CURRENT_SERVICE = i
-                if timed:
-                    break
-                else:
-                    temp_lyrics = lyrics, url, service_name, timed
-        if not timed and temp_lyrics and temp_lyrics[0] != s.Config.ERROR:
-            lyrics, url, service_name, timed = temp_lyrics
+    if sync and CURRENT_SERVICE + 1 < len(SYNCED_SERVICES):
+        url = ''
+        timed = False
+        for i in range(CURRENT_SERVICE + 1, len(SYNCED_SERVICES)):
+            sr = SearchRequest(song.artist, song.name)
+            lyrics = SYNCED_SERVICES[i]().search_and_fetch(sr)
+            if lyrics:
+                lyric_list = LRC(lyrics).lyrics
+                lyrics = '\n'.join(str(l) for l in lyric_list)
+                service_name = SYNCED_SERVICES[i].name
+                timed = True
+                break
+            else:
+                lyrics = s.Config.ERROR
 
-    current_not_synced_service = CURRENT_SERVICE - len(SERVICES_LIST1)
+    current_not_synced_service = CURRENT_SERVICE - len(SYNCED_SERVICES)
     current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
-    if sync and lyrics == s.Config.ERROR or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
+    if sync and lyrics == s.Config.ERROR or not sync or CURRENT_SERVICE > (len(SYNCED_SERVICES) - 1):
         for i in range(current_not_synced_service + 1, len(SERVICES_LIST2)):
             result = SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
             lyrics, url, service_name = result[0], result[1], result[2]
             if lyrics != s.Config.ERROR:
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
-                CURRENT_SERVICE = i + len(SERVICES_LIST1)
+                CURRENT_SERVICE = i + len(SYNCED_SERVICES)
                 break
     if lyrics == s.Config.ERROR:
         service_name = "---"
