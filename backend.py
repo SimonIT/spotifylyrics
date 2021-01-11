@@ -10,12 +10,13 @@ import webbrowser  # to open link on browser
 from collections import namedtuple
 from typing import Tuple
 from urllib import request
-from lrc_kit import ComboLyricProvider, SearchRequest, LRC
+from lrc_kit import SearchRequest, LRC, LyricsProvider
+import lrc_kit
 import requests
 from diskcache import Cache
 import services as s
 
-
+import types
 
 cache = Cache(os.path.join(s.Config.SETTINGS_DIR, 'cache'))
 
@@ -28,8 +29,13 @@ elif sys.platform == "linux":
 elif sys.platform == "darwin":
     import applescript
 
-synced_lyric_provider = ComboLyricProvider()
-SYNCED_SERVICES = synced_lyric_provider.providers
+SYNCED_SERVICES = [
+    lrc_kit.SogeciProvider, 
+    lrc_kit.Music163Provider,
+    lrc_kit.SyairProvider,
+    lrc_kit.RentanaAdvisorProvider,
+    lrc_kit.MegalobizProvider
+]
 
 class Song:
     name = ""
@@ -177,10 +183,10 @@ class VlcMediaPlayer(StreamingService):
 
 # With Sync. Not working: s._minilyrics, s._qq
 # Without Sync.
-SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri, s._azapi]
+UNSYNCED_SERVICES = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri, s._azapi]
 
 # Accords
-SERVICES_LIST3 = [s._ultimateguitar, s._cifraclub, s._songsterr]
+CHORD_SERVICES = [s._ultimateguitar, s._cifraclub, s._songsterr]
 
 '''
 current_service is used to store the current index of the list.
@@ -233,34 +239,44 @@ def load_lyrics(song: Song, **kwargs):
     sync = kwargs.get("sync", False)
     global CURRENT_SERVICE
 
-    if s._local not in SERVICES_LIST2:
-        SERVICES_LIST2.insert(0, s._local)
-
+    if sync and s._local not in SYNCED_SERVICES:
+        SYNCED_SERVICES.insert(0, s._local)
+    elif not sync and s._local not in UNSYNCED_SERVICES:
+        UNSYNCED_SERVICES.insert(0, s._local)
     timed = False
     lyrics = s.Config.ERROR
-    if not CURRENT_SERVICE < (len(SYNCED_SERVICES) + len(SERVICES_LIST2) - 1):
+    if not CURRENT_SERVICE < (len(SYNCED_SERVICES) + len(UNSYNCED_SERVICES) - 1):
         CURRENT_SERVICE = -1
 
     if sync and CURRENT_SERVICE + 1 < len(SYNCED_SERVICES):
         url = ''
         timed = False
+        temp_lyrics = []
         for i in range(CURRENT_SERVICE + 1, len(SYNCED_SERVICES)):
-            sr = SearchRequest(song.artist, song.name)
-            lyrics = SYNCED_SERVICES[i]().search_and_fetch(sr)
-            if lyrics:
-                lyric_list = LRC(lyrics).lyrics
-                lyrics = '\n'.join(str(l) for l in lyric_list)
-                service_name = SYNCED_SERVICES[i].name
-                timed = True
-                break
+            if isinstance(SYNCED_SERVICES[i], types.FunctionType):
+                possible_temp_lyrics = SYNCED_SERVICES[i](song)
+                if not timed: # We can fallback to a untimed lyrics source
+                    temp_lyrics = possible_temp_lyrics
             else:
-                lyrics = s.Config.ERROR
-
+                sr = SearchRequest(song.artist, song.name)
+                lyrics = SYNCED_SERVICES[i]().search_and_fetch(sr) or s.Config.ERROR
+                if lyrics != s.Config.ERROR:
+                    lyrics = LRC(lyrics).lyric_str
+                    service_name = SYNCED_SERVICES[i].name
+                    timed = True
+            if lyrics != s.Config.ERROR: # Keep track of the last valid source
+                CURRENT_SERVICE = i
+            if timed: # Found a timed source, stop search
+                break
+        if temp_lyrics and temp_lyrics[0] != s.Config.ERROR and not timed:
+            # If we never found a timed source, set lyrics to fallback
+            lyrics, url, service_name, timed = temp_lyrics
     current_not_synced_service = CURRENT_SERVICE - len(SYNCED_SERVICES)
     current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
-    if sync and lyrics == s.Config.ERROR or not sync or CURRENT_SERVICE > (len(SYNCED_SERVICES) - 1):
-        for i in range(current_not_synced_service + 1, len(SERVICES_LIST2)):
-            result = SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
+    if sync and lyrics == s.Config.ERROR or \
+        not sync or CURRENT_SERVICE > (len(SYNCED_SERVICES) - 1):
+        for i in range(current_not_synced_service + 1, len(UNSYNCED_SERVICES)):
+            result = UNSYNCED_SERVICES[i](song)  # Can return 4 values if _local was inserted
             lyrics, url, service_name = result[0], result[1], result[2]
             if lyrics != s.Config.ERROR:
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
@@ -294,7 +310,7 @@ def next_lyrics(song: Song, sync=False):
 
 
 def load_chords(song: Song):
-    for i in SERVICES_LIST3:
+    for i in CHORD_SERVICES:
         urls = i(song)
         for url in urls:
             webbrowser.open(url)
