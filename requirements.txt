@@ -12,6 +12,6 @@ unidecode
 pylrc>=0.1.2
 pathvalidate
 diskcache
-sentry-sdk
+sentry-sdk>=0.19.0
 azapi>=3.0.1
 pyinstaller # Only for deployment
