@@ -272,6 +272,8 @@ def _songmeanings(song):
                 result = "http://songmeanings.com" + link['href']
                 lyrics_page = requests.get(result, proxies=Config.PROXY)
                 soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+                for s in soup.select('script'):
+                    s.extract()
                 url = "http://songmeanings.com" + link['href'][2:]
                 break
         lis = soup.find_all('ul', attrs={'data-inset': True})
