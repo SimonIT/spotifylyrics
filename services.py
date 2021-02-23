@@ -9,6 +9,7 @@ import requests
 import unidecode  # to remove accents
 from azapi import azapi
 from bs4 import BeautifulSoup
+from sentry_sdk import capture_exception
 
 try:
     import spotify_lyric.crawlers.QQCrawler as QQCrawler
@@ -90,8 +91,10 @@ def _rentanadviser(song):
 
             return lrc, url, service_name, True
 
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
+    except Exception as e:
+        capture_exception(e)
     return Config.ERROR, url, service_name, False
 
 
@@ -121,8 +124,10 @@ def _megalobiz(song):
             lrc = soup.find("div", class_="lyrics_details").span.get_text()
 
             return lrc, url, service_name, True
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
+    except Exception as e:
+        capture_exception(e)
     return Config.ERROR, url, service_name, False
 
 
@@ -132,7 +137,7 @@ def _qq(song):
         qq = QQCrawler.QQCrawler()
         sid = qq.getSongId(artist=song.artist, song=song.name)
         url = qq.getLyticURI(sid)
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % ("QQ", error))
         return Config.ERROR, url, "QQ", False
 
@@ -181,8 +186,10 @@ def _syair(song):
                                            cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
 
                         return lrc, url, service_name, True
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
+    except Exception as e:
+        capture_exception(e)
     return Config.ERROR, url, service_name, False
 
 
@@ -193,12 +200,9 @@ def _musixmatch(song):
 
     def extract_mxm_props(soup_page):
         scripts = soup_page.find_all("script")
-        props_script = None
         for script in scripts:
             if script and script.contents and "__mxmProps" in script.contents[0]:
-                props_script = script
-                break
-        return props_script.contents[0]
+                return script.contents[0]
 
     try:
         search_url = "https://www.musixmatch.com/search/%s-%s/tracks" % (
@@ -206,23 +210,27 @@ def _musixmatch(song):
         header = {"User-Agent": "curl/7.9.8 (i686-pc-linux-gnu) libcurl 7.9.8 (OpenSSL 0.9.6b) (ipv6 enabled)"}
         search_results = requests.get(search_url, headers=header, proxies=Config.PROXY)
         soup = BeautifulSoup(search_results.text, 'html.parser')
-        page = re.findall('"track_share_url":"([^"]*)', extract_mxm_props(soup))
-        if page:
-            url = codecs.decode(page[0], 'unicode-escape')
-            lyrics_page = requests.get(url, headers=header, proxies=Config.PROXY)
-            soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-            props = extract_mxm_props(soup)
-            if '"body":"' in props:
-                lyrics = props.split('"body":"')[1].split('","language"')[0]
-                lyrics = lyrics.replace("\\n", "\n")
-                lyrics = lyrics.replace("\\", "")
-                if not lyrics.strip():
-                    lyrics = Config.ERROR
-                album = soup.find(class_="mxm-track-footer__album")
-                if album:
-                    song.album = album.find(class_="mui-cell__title").getText()
-    except Exception as error:
+        props = extract_mxm_props(soup)
+        if props:
+            page = re.findall('"track_share_url":"([^"]*)', props)
+            if page:
+                url = codecs.decode(page[0], 'unicode-escape')
+                lyrics_page = requests.get(url, headers=header, proxies=Config.PROXY)
+                soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+                props = extract_mxm_props(soup)
+                if '"body":"' in props:
+                    lyrics = props.split('"body":"')[1].split('","language"')[0]
+                    lyrics = lyrics.replace("\\n", "\n")
+                    lyrics = lyrics.replace("\\", "")
+                    if not lyrics.strip():
+                        lyrics = Config.ERROR
+                    album = soup.find(class_="mxm-track-footer__album")
+                    if album:
+                        song.album = album.find(class_="mui-cell__title").getText()
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
+    except Exception as e:
+        capture_exception(e)
     return lyrics, url, service_name
 
 
@@ -246,10 +254,13 @@ def _songmeanings(song):
                 url = "http://songmeanings.com" + link['href'][2:]
                 break
         lis = soup.find_all('ul', attrs={'data-inset': True})
-        temp_lyrics = lis[1].find_all('li')[1]
-        lyrics = temp_lyrics.getText()
-    except Exception as error:
+        if len(lis) > 1:
+            temp_lyrics = lis[1].find_all('li')[1]
+            lyrics = temp_lyrics.getText()
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
+    except Exception as e:
+        capture_exception(e)
     if lyrics == "We are currently missing these lyrics.":
         lyrics = Config.ERROR
 
@@ -260,22 +271,26 @@ def _songmeanings(song):
 def _songlyrics(song):
     service_name = "Songlyrics"
     url = ""
+    lyrics = Config.ERROR
     try:
         artistm = song.artist.replace(" ", "-")
         songm = song.name.replace(" ", "-")
         url = "https://www.songlyrics.com/%s/%s-lyrics" % (artistm, songm)
         lyrics_page = requests.get(url, proxies=Config.PROXY)
         soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-        lyrics = soup.find(id="songLyricsDiv").get_text()
+        lyrics_container = soup.find(id="songLyricsDiv")
+        if lyrics_container:
+            lyrics = lyrics_container.get_text()
         if "Sorry, we have no" in lyrics or "We do not have" in lyrics:
             lyrics = Config.ERROR
         else:
             for info in soup.find("div", class_="pagetitle").find_all("p"):
                 if "Album:" in info.get_text():
                     song.album = info.find("a").get_text()
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
-        lyrics = Config.ERROR
+    except Exception as e:
+        capture_exception(e)
     return lyrics, url, service_name
 
 
@@ -292,14 +307,17 @@ def _genius(song):
             lyrics = lyrics_container.get_text()
             if song.artist.lower().replace(" ", "") not in soup.text.lower().replace(" ", ""):
                 lyrics = Config.ERROR
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
+    except Exception as e:
+        capture_exception(e)
     return lyrics, url, service_name
 
 
 def _versuri(song):
     service_name = "Versuri"
     url = ""
+    lyrics = Config.ERROR
     try:
         search_url = "https://www.versuri.ro/q/%s+%s/" % \
                      (song.artist.replace(" ", "+").lower(), song.name.replace(" ", "+").lower())
@@ -311,9 +329,7 @@ def _versuri(song):
                 if song.artist.lower() in link_text and song.name.lower() in link_text:
                     url = "https://www.versuri.ro" + search_results['href']
                     break
-        if not url:
-            lyrics = Config.ERROR
-        else:
+        if url:
             lyrics_page = requests.get(url, proxies=Config.PROXY)
             soup = BeautifulSoup(lyrics_page.text, 'html.parser')
             content = soup.find_all('div', {'id': 'pagecontent'})[0]
@@ -321,19 +337,22 @@ def _versuri(song):
             lyrics = lyrics.replace("<br/>", "")
         if "nu există" in lyrics:
             lyrics = Config.ERROR
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
-        lyrics = Config.ERROR
+    except Exception as e:
+        capture_exception(e)
     return lyrics, url, service_name
 
 
 def _azapi(song):
     service = "Azapi"
+    lyrics = Config.ERROR
+    url = ""
 
     try:
         try:
             api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
-        except ConnectionError:
+        except requests.exceptions.RequestException:
             api = azapi.AZlyrics('google', accuracy=0.5, proxies=Config.PROXY)
 
         if not song.artist:
@@ -353,14 +372,18 @@ def _azapi(song):
         if result_song["year"]:
             song.year = int(result_song["year"])
 
+        url = result_song["url"]
+
         lyrics = api.getLyrics(url=result_song["url"])
-    except ConnectionError:
+    except requests.exceptions.RequestException:
         lyrics = None
+    except Exception as e:
+        capture_exception(e)
 
     if not isinstance(lyrics, str):
         return Config.ERROR, "", service
 
-    return lyrics, result_song["url"], service
+    return lyrics, url, service
 
 
 # tab/chord services
@@ -399,7 +422,7 @@ def _cifraclub(song):
 
     try:
         result = requests.get(url, proxies=Config.PROXY)
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("cifraclub: %s" % error)
         return []
 
@@ -477,8 +500,10 @@ def _tanzmusikonline(song):
                             song.cycles_per_minute = int(text)
                         elif "fa-tachometer" in classes:
                             song.beats_per_minute = int(text)
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % ("Tanzmusik Online", error))
+    except Exception as e:
+        capture_exception(e)
 
 
 def _welchertanz(song):
@@ -505,5 +530,7 @@ def _welchertanz(song):
                             .replace("Foxtrott", "Foxtrot")
                         if dance_name != "---" and dance_name not in song.dances:
                             song.dances.append(dance_name)
-    except Exception as error:
+    except requests.exceptions.RequestException as error:
         print("%s: %s" % ("Tanzschule Woelbing", error))
+    except Exception as e:
+        capture_exception(e)
