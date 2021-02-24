@@ -284,9 +284,11 @@ def _songlyrics(song):
         if "Sorry, we have no" in lyrics or "We do not have" in lyrics:
             lyrics = Config.ERROR
         else:
-            for info in soup.find("div", class_="pagetitle").find_all("p"):
-                if "Album:" in info.get_text():
-                    song.album = info.find("a").get_text()
+            title = soup.find("div", class_="pagetitle")
+            if title:
+                for info in title.find_all("p"):
+                    if "Album:" in info.get_text():
+                        song.album = info.find("a").get_text()
     except requests.exceptions.RequestException as error:
         print("%s: %s" % (service_name, error))
     except Exception as e:

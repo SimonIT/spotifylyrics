@@ -342,8 +342,9 @@ def get_window_title(service: StreamingService) -> str:
                 for pid in spids:
                     win32gui.EnumWindows(enum_window_callback, pid)
                     for item in windows:
-                        if win32gui.GetWindowText(item):
-                            window_name = win32gui.GetWindowText(item)
+                        txt = win32gui.GetWindowText(item)
+                        if txt:
+                            window_name = txt
                             raise StopIteration
             except StopIteration:
                 pass
