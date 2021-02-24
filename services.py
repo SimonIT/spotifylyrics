@@ -253,6 +253,8 @@ def _songmeanings(song):
                 soup = BeautifulSoup(lyrics_page.text, 'html.parser')
                 url = "http://songmeanings.com" + link['href'][2:]
                 break
+        for s in soup.select('script'):
+            s.extract()
         lis = soup.find_all('ul', attrs={'data-inset': True})
         if len(lis) > 1:
             temp_lyrics = lis[1].find_all('li')[1]
