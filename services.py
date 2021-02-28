@@ -193,6 +193,33 @@ def _syair(song):
     return Config.ERROR, url, service_name, False
 
 
+def _rclyricsband(song):
+    service_name = "RC Lyrics Band"
+    url = ""
+    lyrics = Config.ERROR
+    try:
+        search_results = requests.get("https://rclyricsband.com/", params={"s": "%s %s" % (song.artist, song.name)})
+        search_soup = BeautifulSoup(search_results.text, 'html.parser')
+
+        for result in search_soup.find(id="content").find_all("article"):
+            title_link = result.find(rel="bookmark")
+            lower_title = title_link.get_text().lower()
+            if song.artist.lower() in lower_title and song.name.lower() in lower_title:
+                url = title_link["href"]
+                break
+
+        if url:
+            song_page = requests.get(url)
+            song_page_soup = BeautifulSoup(song_page.text, 'html.parser')
+            lyrics = requests.get(song_page_soup.find_all(class_="su-button")[2]["href"]).text
+
+    except requests.exceptions.RequestException as error:
+        print("%s: %s" % (service_name, error))
+    except Exception as e:
+        capture_exception(e)
+    return lyrics, url, service_name, True
+
+
 def _musixmatch(song):
     service_name = "Musixmatch"
     url = ""

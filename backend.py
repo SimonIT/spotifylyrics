@@ -173,7 +173,7 @@ class VlcMediaPlayer(StreamingService):
 
 
 # With Sync. Not working: s._minilyrics, s._qq
-SERVICES_LIST1 = [s._rentanadviser, s._syair, s._megalobiz]
+SERVICES_LIST1 = [s._rentanadviser, s._syair, s._megalobiz, s._rclyricsband]
 
 # Without Sync.
 SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri, s._azapi]
