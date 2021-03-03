@@ -212,7 +212,7 @@ def cache_lyrics(func):
             except ValueError:
                 recreate_cache()
                 lyrics_metadata = None
-            if not lyrics_metadata or lyrics_metadata.lyrics == s.Config.ERROR:
+            if not lyrics_metadata or not lyrics_metadata.lyrics:
                 lyrics_metadata = func(*args, **kwargs)
                 try:
                     cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
@@ -240,36 +240,39 @@ def load_lyrics(song: Song, **kwargs):
             SERVICES_LIST2.insert(0, s._local)
 
     timed = False
-    lyrics = s.Config.ERROR
+    lyrics = ""
+    service_name = "---"
+    url = ""
     if not CURRENT_SERVICE < (len(SERVICES_LIST1) + len(SERVICES_LIST2) - 1):
         CURRENT_SERVICE = -1
 
     if sync and CURRENT_SERVICE + 1 < len(SERVICES_LIST1):
         temp_lyrics = []
         for i in range(CURRENT_SERVICE + 1, len(SERVICES_LIST1)):
-            lyrics, url, service_name, timed = SERVICES_LIST1[i](song)
-            if lyrics != s.Config.ERROR:
+            result = SERVICES_LIST1[i](song)
+            if result:
+                lyrics, url, service_name, timed = result
                 CURRENT_SERVICE = i
                 if timed:
                     break
                 else:
                     temp_lyrics = lyrics, url, service_name, timed
-        if not timed and temp_lyrics and temp_lyrics[0] != s.Config.ERROR:
+        if not timed and temp_lyrics and temp_lyrics[0]:
             lyrics, url, service_name, timed = temp_lyrics
 
     current_not_synced_service = CURRENT_SERVICE - len(SERVICES_LIST1)
     current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
-    if sync and lyrics == s.Config.ERROR or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
+    if sync and not lyrics or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
         for i in range(current_not_synced_service + 1, len(SERVICES_LIST2)):
             result = SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
-            lyrics, url, service_name = result[0], result[1], result[2]
-            if lyrics != s.Config.ERROR:
+            if result:
+                lyrics, url, service_name = result
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
                 CURRENT_SERVICE = i + len(SERVICES_LIST1)
                 break
-    if lyrics == s.Config.ERROR:
-        service_name = "---"
 
+    if not lyrics:
+        lyrics = "Error: Could not find lyrics."
     # return "Error: Could not find lyrics."  if the for loop doesn't find any lyrics
     return LyricsMetadata(lyrics, url, service_name, timed)
 

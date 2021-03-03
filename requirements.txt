@@ -6,7 +6,6 @@ sip
 PyQt5-stubs
 PyQt5
 requests>=2.20.0
-xmltodict
 psutil; sys_platform == 'win32'
 unidecode
 pylrc>=0.1.2
