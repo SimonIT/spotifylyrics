@@ -24,8 +24,11 @@ class LyricsTest(unittest.TestCase):
     def test_services(self):
         for service in self.services_to_test:
             for song in self.songs:
-                path = os.path.abspath("res/" + song.artist.lower() + " - " + song.name.lower())
-                with open(path, "rb") as lyrics_words:
-                    result = service(song)
+                path = os.path.abspath("res/%s - %s" % (song.artist.lower(), song.name.lower()))
+                result = service(song)
 
-                    self.assertTrue(any(x in result[0].lower() for x in pickle.load(lyrics_words)))
+                if result:
+                    with open(path, "rb") as lyrics_words:
+                        self.assertTrue(any(x in result[0].lower() for x in pickle.load(lyrics_words)))
+                else:
+                    print("%s %s not on %s not found" % (song.artist, song.name, service.__name__))
