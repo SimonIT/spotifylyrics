@@ -172,12 +172,6 @@ class VlcMediaPlayer(StreamingService):
         return "VLC"
 
 
-# With Sync. Not working: s._minilyrics, s._qq
-SERVICES_LIST1 = [s._rentanadviser, s._syair, s._megalobiz, s._rclyricsband]
-
-# Without Sync.
-SERVICES_LIST2 = [s._musixmatch, s._songmeanings, s._songlyrics, s._genius, s._versuri, s._azapi]
-
 # Accords
 SERVICES_LIST3 = [s._ultimateguitar, s._cifraclub, s._songsterr]
 
@@ -233,23 +227,23 @@ def load_lyrics(song: Song, **kwargs):
     global CURRENT_SERVICE
 
     if sync:
-        if s._local not in SERVICES_LIST1:
-            SERVICES_LIST1.insert(0, s._local)
+        if s._local not in s.SERVICES_LIST1:
+            s.SERVICES_LIST1.insert(0, s._local)
     else:
-        if s._local not in SERVICES_LIST2:
-            SERVICES_LIST2.insert(0, s._local)
+        if s._local not in s.SERVICES_LIST2:
+            s.SERVICES_LIST2.insert(0, s._local)
 
     timed = False
     lyrics = ""
     service_name = "---"
     url = ""
-    if not CURRENT_SERVICE < (len(SERVICES_LIST1) + len(SERVICES_LIST2) - 1):
+    if not CURRENT_SERVICE < (len(s.SERVICES_LIST1) + len(s.SERVICES_LIST2) - 1):
         CURRENT_SERVICE = -1
 
-    if sync and CURRENT_SERVICE + 1 < len(SERVICES_LIST1):
+    if sync and CURRENT_SERVICE + 1 < len(s.SERVICES_LIST1):
         temp_lyrics = []
-        for i in range(CURRENT_SERVICE + 1, len(SERVICES_LIST1)):
-            result = SERVICES_LIST1[i](song)
+        for i in range(CURRENT_SERVICE + 1, len(s.SERVICES_LIST1)):
+            result = s.SERVICES_LIST1[i](song)
             if result:
                 lyrics, url, service_name, timed = result
                 CURRENT_SERVICE = i
@@ -260,15 +254,15 @@ def load_lyrics(song: Song, **kwargs):
         if not timed and temp_lyrics and temp_lyrics[0]:
             lyrics, url, service_name, timed = temp_lyrics
 
-    current_not_synced_service = CURRENT_SERVICE - len(SERVICES_LIST1)
+    current_not_synced_service = CURRENT_SERVICE - len(s.SERVICES_LIST1)
     current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
-    if sync and not lyrics or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
-        for i in range(current_not_synced_service + 1, len(SERVICES_LIST2)):
-            result = SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
+    if sync and not lyrics or not sync or CURRENT_SERVICE > (len(s.SERVICES_LIST1) - 1):
+        for i in range(current_not_synced_service + 1, len(s.SERVICES_LIST2)):
+            result = s.SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
             if result:
                 lyrics, url, service_name = result
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
-                CURRENT_SERVICE = i + len(SERVICES_LIST1)
+                CURRENT_SERVICE = i + len(s.SERVICES_LIST1)
                 break
 
     if not lyrics:

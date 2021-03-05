@@ -19,6 +19,13 @@ except ModuleNotFoundError:
     pass
 
 
+# With Sync.
+SERVICES_LIST1 = []
+
+# Without Sync.
+SERVICES_LIST2 = []
+
+
 class Config:
     PROXY = request.getproxies()
 
@@ -33,7 +40,7 @@ class Config:
 UA = "Mozilla/5.0 (Maemo; Linux armv7l; rv:10.0.1) Gecko/20100101 Firefox/10.0.1 Fennec/10.0.1"
 
 
-def lyrics_service(_func=None, *, synced=False):
+def lyrics_service(_func=None, *, synced=False, enabled=True):
     def _decorator_lyrics_service(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -43,6 +50,11 @@ def lyrics_service(_func=None, *, synced=False):
                 print("%s: %s" % (func.__name__, error))
             except Exception as e:
                 capture_exception(e)
+        if enabled:
+            if synced:
+                SERVICES_LIST1.append(wrapper)
+            else:
+                SERVICES_LIST2.append(wrapper)
         return wrapper
     if _func is None:
         return _decorator_lyrics_service
@@ -125,7 +137,7 @@ def _megalobiz(song):
             return lrc, possible_text.url, service_name, True
 
 
-@lyrics_service(synced=True)
+@lyrics_service(synced=True, enabled=False)
 def _qq(song):
     qq = QQCrawler.QQCrawler()
     sid = qq.getSongId(artist=song.artist, song=song.name)
@@ -200,7 +212,7 @@ def _musixmatch(song):
             if script and script.contents and "__mxmProps" in script.contents[0]:
                 return script.contents[0]
 
-    search_url = "https://www.musixmatch.com/search/%s-%s/tracks" % (
+    search_url = "https://www.musixmatch.com/search/%s-%s" % (
         song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
     header = {"User-Agent": "curl/7.9.8 (i686-pc-linux-gnu) libcurl 7.9.8 (OpenSSL 0.9.6b) (ipv6 enabled)"}
     search_results = requests.get(search_url, headers=header, proxies=Config.PROXY)
@@ -274,7 +286,7 @@ def _songlyrics(song):
 @lyrics_service
 def _genius(song):
     service_name = "Genius"
-    url = "http://genius.com/%s-%s-lyrics" % (song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
+    url = "https://genius.com/%s-%s-lyrics" % (song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
     lyrics_page = requests.get(url, proxies=Config.PROXY)
     soup = BeautifulSoup(lyrics_page.text, 'html.parser')
     lyrics_container = soup.find("div", {"class": "lyrics"})
