@@ -390,7 +390,7 @@ def check_version() -> bool:
         return get_version() >= \
                float(requests.get("https://api.github.com/repos/SimonIT/spotifylyrics/tags", timeout=5, proxies=proxy)
                      .json()[0]["name"])
-    except Exception:
+    except requests.exceptions.RequestException:
         return True
 
 
@@ -403,7 +403,7 @@ def open_spotify(service: StreamingService) -> bool:
         if not get_window_title(service):
             try:
                 subprocess.Popen(service.get_windows_exe_path())
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError):
                 return False
     elif sys.platform == "linux":
         if not get_window_title(service):
