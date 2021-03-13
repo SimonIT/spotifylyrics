@@ -13,6 +13,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.9
+      - name: Install build tools
+        run: pip install wheel pyinstaller
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Setup PYTHONPATH
@@ -39,6 +41,8 @@ jobs:
           python-version: 3.9
       - name: Install dbus
         run: sudo apt install libdbus-1-dev libdbus-glib-1-dev --yes
+      - name: Install build tools
+        run: pip install wheel pyinstaller
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Setup PYTHONPATH
@@ -63,6 +67,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.9
+      - name: Install build tools
+        run: pip install wheel pyinstaller
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Setup PYTHONPATH
