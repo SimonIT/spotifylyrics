@@ -50,12 +50,14 @@ def lyrics_service(_func=None, *, synced=False, enabled=True):
                 print("%s: %s" % (func.__name__, error))
             except Exception as e:
                 capture_exception(e)
+
         if enabled:
             if synced:
                 SERVICES_LIST1.append(wrapper)
             else:
                 SERVICES_LIST2.append(wrapper)
         return wrapper
+
     if _func is None:
         return _decorator_lyrics_service
     else:
@@ -185,7 +187,8 @@ def _syair(song):
 @lyrics_service(synced=True)
 def _rclyricsband(song):
     service_name = "RC Lyrics Band"
-    search_results = requests.get("https://rclyricsband.com/", params={"s": "%s %s" % (song.artist, song.name)})
+    search_results = requests.get("https://rclyricsband.com/", params={"s": "%s %s" % (song.artist, song.name)},
+                                  proxies=Config.PROXY)
     search_soup = BeautifulSoup(search_results.text, 'html.parser')
 
     for result in search_soup.find(id="content").find_all("article"):
