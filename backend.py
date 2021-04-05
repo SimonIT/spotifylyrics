@@ -2,6 +2,7 @@
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -203,14 +204,14 @@ def cache_lyrics(func):
         if not ignore_cache:
             try:
                 lyrics_metadata = cache.get(clean_song_name)
-            except ValueError:
+            except (ValueError, sqlite3.DatabaseError):
                 recreate_cache()
                 lyrics_metadata = None
             if not lyrics_metadata or not lyrics_metadata.lyrics:
                 lyrics_metadata = func(*args, **kwargs)
                 try:
                     cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
-                except ValueError:
+                except (ValueError, sqlite3.DatabaseError):
                     recreate_cache()
             return lyrics_metadata
         else:
