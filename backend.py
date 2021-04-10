@@ -204,19 +204,22 @@ def cache_lyrics(func):
         if not ignore_cache:
             try:
                 lyrics_metadata = cache.get(clean_song_name)
-            except (ValueError, sqlite3.DatabaseError):
+            except (PermissionError, ValueError, sqlite3.DatabaseError):
                 recreate_cache()
                 lyrics_metadata = None
             if not lyrics_metadata or not lyrics_metadata.lyrics:
                 lyrics_metadata = func(*args, **kwargs)
                 try:
                     cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
-                except (ValueError, sqlite3.DatabaseError):
+                except (PermissionError, ValueError, sqlite3.DatabaseError):
                     recreate_cache()
             return lyrics_metadata
         else:
             lyrics_metadata = func(*args, **kwargs)
-            cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
+            try:
+                cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
+            except (PermissionError, ValueError, sqlite3.DatabaseError):
+                recreate_cache()
             return lyrics_metadata
 
     return wrapper
