@@ -28,7 +28,7 @@ jobs:
         uses: actions/upload-artifact@v2.1.4
         with:
           name: macos
-          path: dist/SpotifyLyrics.app
+          path: dist/
   linux:
     runs-on: ubuntu-latest
     steps:
