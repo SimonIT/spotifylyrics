@@ -25,6 +25,7 @@ jobs:
       - name: Build .app
         run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.icns --add-data "icon.png:."
       - name: Upload .app
+        if: github.event_name == 'release' && github.event.action == 'created'
         uses: actions/upload-artifact@v2.1.4
         with:
           name: macos
@@ -53,6 +54,7 @@ jobs:
       - name: Build executable
         run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.ico --add-data "icon.png:."
       - name: Upload executable
+        if: github.event_name == 'release' && github.event.action == 'created'
         uses: actions/upload-artifact@v2.1.4
         with:
           name: linux
@@ -79,6 +81,7 @@ jobs:
       - name: Build .exe
         run: pyinstaller SpotifyLyrics.pyw -F -w -i icon.ico --add-data "icon.png;."
       - name: Upload .exe
+        if: github.event_name == 'release' && github.event.action == 'created'
         uses: actions/upload-artifact@v2.1.4
         with:
           name: windows
