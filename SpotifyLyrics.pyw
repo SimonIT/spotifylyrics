@@ -190,6 +190,11 @@ class UiForm:
         FORM.setTabOrder(self.text_browser, self.options_combobox)
         FORM.setTabOrder(self.options_combobox, self.font_size_box)
 
+        self.current_line_size_ratio = 1.25
+        self.current_line_style = {
+            "font-size": f"{self.current_line_size_ratio * self.font_size_box.value()}pt"
+        }
+
         self.set_style()
         self.load_save_settings()
         self.spotify()
@@ -387,7 +392,7 @@ class UiForm:
         style_config = configparser.ConfigParser()
 
         with open(theme_file, 'r') as theme:
-            style_config.read_string("[%s]\n%s" % (section, theme.read()))
+            style_config.read_string(f"[{section}]\n{theme.read()}")
 
         align = style_config.get(section, "lyricstextalign", fallback="")
         if align:
@@ -400,21 +405,21 @@ class UiForm:
 
         background = style_config.get(section, "backgroundcolor", fallback="")
         if background:
-            FORM.setStyleSheet("background-color: %s;" % background)
+            FORM.setStyleSheet(f"background-color: {background};")
 
         style = self.text_browser.styleSheet()
 
         text_background = style_config.get(section, "lyricsbackgroundcolor", fallback="")
         if text_background:
-            style = style + "background-color: %s;" % text_background
+            style = f"{style}background-color: {text_background};"
 
         text_color = style_config.get(section, "lyricstextcolor", fallback="")
         if text_color:
-            style = style + "color: %s;" % text_color
+            style = f"{style}color: %s;" % text_color
 
         text_font = style_config.get(section, "lyricsfont", fallback="")
         if text_font:
-            style = style + "font-family: \"%s\";" % text_font
+            style = f"{style}font-family: \"{text_font}\";"
 
         self.text_browser.setStyleSheet(style)
 
@@ -423,12 +428,12 @@ class UiForm:
         label_color = style_config.get(section, "songnamecolor", fallback="")
         if label_color:
             style = style + "color: %s;" % label_color
-            text = re.sub("color:.*?;", "color: %s;" % label_color, self.label_song_name.text())
+            text = re.sub("color:.*?;", f"color: {label_color};", self.label_song_name.text())
             self.label_song_name.setText(text)
 
         label_underline = style_config.getboolean(section, "songnameunderline", fallback=False)
         if label_underline:
-            style = style + "text-decoration: underline;"
+            style = f"{style}text-decoration: underline;"
 
         self.label_song_name.setStyleSheet(style)
 
@@ -436,11 +441,11 @@ class UiForm:
 
         font_size_background = style_config.get(section, "fontboxbackgroundcolor", fallback="")
         if font_size_background:
-            style = style + "background-color: %s;" % font_size_background
+            style = f"{style}background-color: {font_size_background};"
 
         font_size_color = style_config.get(section, "fontboxtextcolor", fallback="")
         if font_size_color:
-            style = style + "color: %s;" % font_size_color
+            style = f"{style}color: {font_size_color};"
 
         self.streaming_services_box.setStyleSheet(style)
         self.options_combobox.setStyleSheet(style)
@@ -448,6 +453,13 @@ class UiForm:
         self.change_lyrics_button.setStyleSheet(style)
         self.save_button.setStyleSheet(style)
         self.chords_button.setStyleSheet(style)
+
+        self.current_line_size_ratio = style_config.getfloat(section, "currentLineSizeRatio", fallback=1.25)
+        self.current_line_style["font-size"] = f"{self.current_line_size_ratio * self.font_size_box.value()}pt"
+
+        current_line_background_color = style_config.get(section, "currentLineBackgroundColor", fallback="")
+        if current_line_background_color:
+            self.current_line_style["background-color"] = current_line_background_color
 
     def set_dark_theme(self):
         self.dark_theme = True
@@ -489,14 +501,15 @@ class UiForm:
         style = self.text_browser.styleSheet()
         style = style.replace('%s' % style[style.find("font"):style.find("pt;") + 3], '')
         style = style.replace('p ', '')
-        self.text_browser.setStyleSheet(style + "p font-size: %spt;" % self.font_size_box.value() * 2)
+        self.text_browser.setStyleSheet(f"{style}p font-size: {self.font_size_box.value() * 2}pt;")
         lyrics = self.text_browser.toPlainText()
         self.set_lyrics_with_alignment(lyrics)
+        self.current_line_style["font-size"] = f"{self.current_line_size_ratio * self.font_size_box.value()}pt"
         self.load_save_settings(save=True)
 
     def retranslate_ui(self, form):
         _translate = QtCore.QCoreApplication.translate
-        form.setWindowTitle(_translate("Form", "Spotify Lyrics - {}".format(backend.get_version())))
+        form.setWindowTitle(_translate("Form", f"Spotify Lyrics - {backend.get_version()}"))
         form.setWindowIcon(QtGui.QIcon(self.get_resource_path('icon.png')))
         if backend.check_version():
             self.label_song_name.setText(_translate("Form", "Spotify Lyrics"))
@@ -593,8 +606,8 @@ class UiForm:
                                 line_changed = True
                             if line_changed:
                                 lrc[count - 1].text = HTML_TAGS.sub("", lrc[count - 1].text)
-                                lrc[count].text = """<b style="font-size: %spt">%s</b>""" % \
-                                                  (self.font_size_box.value() * 1.25, lrc[count].text)
+                                lrc[count].text =\
+                                    f"<b style=\"{self.dict_to_style(self.current_line_style)}\">{lrc[count].text}</b>"
                                 if count - 2 > 0:
                                     lrc[count - 3].text = HTML_TAGS.sub("", lrc[count - 3].text)
                                     lrc[count - 2].text = "<a name=\"#scrollHere\">%s</a>" % lrc[count - 2].text
@@ -732,7 +745,7 @@ class UiForm:
                             return
 
         if not new_lyrics_file_name:
-            new_lyrics_file_name = os.path.join(Config.LYRICS_DIR, "%s - %s" % (artist, name))
+            new_lyrics_file_name = os.path.join(Config.LYRICS_DIR, f"{artist} - {name}")
 
         text = self.lyrics
         if self.timed:
@@ -758,6 +771,13 @@ class UiForm:
             save_dialog.setText("Couldn't open %s!" % str(self.get_current_streaming_service()))
             save_dialog.setStandardButtons(QMessageBox.Ok)
             save_dialog.exec()
+
+    @classmethod
+    def dict_to_style(cls, dictionary: dict) -> str:
+        style = ""
+        for key, value in dictionary.items():
+            style = f"{style}{key}: {value};"
+        return style
 
 
 class FormWidget(QtWidgets.QWidget):
@@ -789,7 +809,7 @@ class FormWidget(QtWidgets.QWidget):
 
 if __name__ == "__main__":
     sentry_sdk.init("https://71bf000cb7c5448c8c08660b29a12c09@o407859.ingest.sentry.io/5277612",
-                    release="spotifylyrics@" + str(backend.get_version()), auto_enabling_integrations=False)
+                    release=f"spotifylyrics@{backend.get_version()}", auto_enabling_integrations=False)
     with sentry_sdk.configure_scope() as scope:
         try:
             scope.set_user({"username": getpass.getuser()})

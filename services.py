@@ -30,9 +30,9 @@ class Config:
     PROXY = request.getproxies()
 
     if os.name == "nt":
-        SETTINGS_DIR = os.getenv("APPDATA") + "\\SpotifyLyrics\\"
+        SETTINGS_DIR = f"{os.getenv('APPDATA')}\\SpotifyLyrics\\"
     else:
-        SETTINGS_DIR = os.path.expanduser("~") + "/.SpotifyLyrics/"
+        SETTINGS_DIR = f"{os.path.expanduser('~')}/.SpotifyLyrics/"
     DEFAULT_LYRICS_DIR = os.path.join(SETTINGS_DIR, "lyrics")
     LYRICS_DIR = DEFAULT_LYRICS_DIR
 
@@ -82,7 +82,7 @@ def _local(song):
                         with open(file, "r", encoding="UTF-8") as lyrics_file:
                             lyrics = lyrics_file.read()
                         timed = file_extension == ".lrc"
-                        url = "file:///" + os.path.abspath(file)
+                        url = f"file:///{os.path.abspath(file)}"
                         return lyrics, url, service_name, timed
 
 
@@ -91,7 +91,7 @@ def _rentanadviser(song):
     service_name = "RentAnAdviser"
 
     search_url = "https://www.rentanadviser.com/en/subtitles/subtitles4songs.aspx?%s" % parse.urlencode({
-        "src": song.artist + " " + song.name
+        "src":  f"{song.artist} {song.name}"
     })
     search_results = requests.get(search_url, proxies=Config.PROXY)
     soup = BeautifulSoup(search_results.text, 'html.parser')
@@ -101,7 +101,7 @@ def _rentanadviser(song):
         if result_link["href"] != "subtitles4songs.aspx":
             lower_title = result_link.get_text().lower()
             if song.artist.lower() in lower_title and song.name.lower() in lower_title:
-                url = "https://www.rentanadviser.com/en/subtitles/%s&type=lrc" % result_link["href"]
+                url = f'https://www.rentanadviser.com/en/subtitles/{result_link["href"]}&type=lrc'
                 possible_text = requests.get(url, proxies=Config.PROXY)
                 soup = BeautifulSoup(possible_text.text, 'html.parser')
 
@@ -120,7 +120,7 @@ def _megalobiz(song):
     service_name = "Megalobiz"
 
     search_url = "https://www.megalobiz.com/search/all?%s" % parse.urlencode({
-        "qry": song.artist + " " + song.name,
+        "qry": f"{song.artist} {song.name}",
         "display": "more"
     })
     search_results = requests.get(search_url, proxies=Config.PROXY)
@@ -130,7 +130,7 @@ def _megalobiz(song):
     for result_link in result_links:
         lower_title = result_link.get_text().lower()
         if song.artist.lower() in lower_title and song.name.lower() in lower_title:
-            url = "https://www.megalobiz.com%s" % result_link["href"]
+            url = f"https://www.megalobiz.com{result_link['href']}"
             possible_text = requests.get(url, proxies=Config.PROXY)
             soup = BeautifulSoup(possible_text.text, 'html.parser')
 
@@ -158,7 +158,7 @@ def _syair(song):
     service_name = "Syair"
 
     search_url = "https://www.syair.info/search?%s" % parse.urlencode({
-        "q": song.artist + " " + song.name
+        "q": f"{song.artist} {song.name}"
     })
     search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
     soup = BeautifulSoup(search_results.text, 'html.parser')
@@ -173,13 +173,13 @@ def _syair(song):
                 result_link = result.find("a")
                 name = result_link.get_text().lower()
                 if song.artist.lower() in name and song.name.lower() in name:
-                    url = "https://www.syair.info%s" % result_link["href"]
+                    url = f"https://www.syair.info{result_link['href']}"
                     lyrics_page = requests.get(url, proxies=Config.PROXY, headers={"User-Agent": UA})
                     soup = BeautifulSoup(lyrics_page.text, 'html.parser')
                     for download_link in soup.find_all("a"):
                         if "download.php" in download_link["href"]:
                             lrc_link = download_link["href"]
-                            lrc = requests.get("https://www.syair.info%s" % lrc_link, proxies=Config.PROXY,
+                            lrc = requests.get(f"https://www.syair.info{lrc_link}", proxies=Config.PROXY,
                                                cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
                             return lrc, lyrics_page.url, service_name, True
 
@@ -245,10 +245,10 @@ def _songmeanings(song):
     url = ""
     for link in soup.find_all('a', href=True):
         if "songmeanings.com/m/songs/view/" in link['href']:
-            url = "https:" + link['href']
+            url = f"https:{link['href']}"
             break
         elif "/m/songs/view/" in link['href']:
-            result = "http://songmeanings.com" + link['href']
+            result = f"https://songmeanings.com{link['href']}"
             lyrics_page = requests.get(result, proxies=Config.PROXY)
             soup = BeautifulSoup(lyrics_page.text, 'html.parser')
             url = lyrics_page.url
@@ -266,7 +266,7 @@ def _songlyrics(song):
     service_name = "Songlyrics"
     artistm = song.artist.replace(" ", "-")
     songm = song.name.replace(" ", "-")
-    url = "https://www.songlyrics.com/%s/%s-lyrics" % (artistm, songm)
+    url = f"https://www.songlyrics.com/{artistm}/{songm}-lyrics"
     lyrics_page = requests.get(url, proxies=Config.PROXY)
     soup = BeautifulSoup(lyrics_page.text, 'html.parser')
     lyrics_container = soup.find(id="songLyricsDiv")
@@ -380,7 +380,7 @@ def _cifraclub(song):
     try:
         result = requests.get(url, proxies=Config.PROXY)
     except requests.exceptions.RequestException as error:
-        print("cifraclub: %s" % error)
+        print(f"cifraclub: {error}")
         return []
 
     if result.status_code == 200:
@@ -394,7 +394,7 @@ def _cifraclub(song):
 def _songsterr(song):
     artist = unidecode.unidecode(song.artist)
     title = unidecode.unidecode(song.name)
-    url = 'http://www.songsterr.com/a/wa/bestMatchForQueryString?s={}&a={}'.format(title, artist)
+    url = 'https://www.songsterr.com/a/wa/bestMatchForQueryString?s={}&a={}'.format(title, artist)
     return [url]
 
 
