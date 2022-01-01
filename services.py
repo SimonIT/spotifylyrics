@@ -18,6 +18,7 @@ try:
 except ModuleNotFoundError:
     pass
 
+
 # With Sync.
 SERVICES_LIST1 = []
 
@@ -90,7 +91,7 @@ def _rentanadviser(song):
     service_name = "RentAnAdviser"
 
     search_url = "https://www.rentanadviser.com/en/subtitles/subtitles4songs.aspx?%s" % parse.urlencode({
-        "src": f"{song.artist} {song.name}"
+        "src":  f"{song.artist} {song.name}"
     })
     search_results = requests.get(search_url, proxies=Config.PROXY)
     soup = BeautifulSoup(search_results.text, 'html.parser')
@@ -101,24 +102,15 @@ def _rentanadviser(song):
             lower_title = result_link.get_text().lower()
             if song.artist.lower() in lower_title and song.name.lower() in lower_title:
                 url = f'https://www.rentanadviser.com/en/subtitles/{result_link["href"]}&type=lrc'
-                possible_text = requests.get(url, proxies=Config.PROXY, cookies=search_results.cookies)
+                possible_text = requests.get(url, proxies=Config.PROXY)
                 soup = BeautifulSoup(possible_text.text, 'html.parser')
 
-                event_target = soup.find(id="__EVENTTARGET")["value"]
-                event_argument = soup.find(id="__EVENTARGUMENT")["value"]
                 event_validation = soup.find(id="__EVENTVALIDATION")["value"]
                 view_state = soup.find(id="__VIEWSTATE")["value"]
-                view_state_generator = soup.find(id="__VIEWSTATEGENERATOR")["value"]
 
-                lrc = requests.post(url, {
-                    "ctl00$ContentPlaceHolder1$txtsearchsubtitle": "Search+Lyrics+&+Subtitles",
-                    "ctl00$ContentPlaceHolder1$Overcome_Enter_problem_in_IE2": "",
-                    "__EVENTTARGET": event_target,
-                    "__EVENTARGUMENT": event_argument,
-                    "__VIEWSTATEGENERATOR": view_state_generator,
-                    "__EVENTVALIDATION": event_validation,
-                    "__VIEWSTATE": view_state,
-                }, proxies=Config.PROXY, cookies=possible_text.cookies).text
+                lrc = requests.post(url, {"__EVENTTARGET": "ctl00$ContentPlaceHolder1$btnlyrics",
+                                          "__EVENTVALIDATION": event_validation,
+                                          "__VIEWSTATE": view_state}, proxies=Config.PROXY).text
 
                 return lrc, possible_text.url, service_name, True
 
