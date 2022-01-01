@@ -11,7 +11,7 @@ The lyrics are fetched from these sites:
 
 - rentanadviser.com (synchronized)
 - megalobiz.com (synchronized)
-- syair.info (synchronized)
+- lyricsify.com (synchronized)
 - rclyricsband.com (synchronized)
 - musixmatch.com
 - songmeanings.com

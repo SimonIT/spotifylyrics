@@ -162,10 +162,10 @@ def _qq(song):
 
 
 @lyrics_service(synced=True)
-def _syair(song):
-    service_name = "Syair"
+def _lyricsify(song):
+    service_name = "Lyricsify"
 
-    search_url = "https://www.syair.info/search?%s" % parse.urlencode({
+    search_url = "https://www.lyricsify.com/search?%s" % parse.urlencode({
         "q": f"{song.artist} {song.name}"
     })
     search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
@@ -181,15 +181,14 @@ def _syair(song):
                 result_link = result.find("a")
                 name = result_link.get_text().lower()
                 if song.artist.lower() in name and song.name.lower() in name:
-                    url = f"https://www.syair.info{result_link['href']}"
+                    url = f"https://www.lyricsify.com{result_link['href']}?download"
                     lyrics_page = requests.get(url, proxies=Config.PROXY, headers={"User-Agent": UA})
                     soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-                    for download_link in soup.find_all("a"):
-                        if "download.php" in download_link["href"]:
-                            lrc_link = download_link["href"]
-                            lrc = requests.get(f"https://www.syair.info{lrc_link}", proxies=Config.PROXY,
-                                               cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
-                            return lrc, lyrics_page.url, service_name, True
+
+                    download_link = soup.find(id="iframe_download")["src"]
+                    lrc = requests.get(download_link, proxies=Config.PROXY,
+                                       cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
+                    return lrc, lyrics_page.url, service_name, True
 
 
 @lyrics_service(synced=True)
