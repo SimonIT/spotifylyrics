@@ -18,7 +18,6 @@ try:
 except ModuleNotFoundError:
     pass
 
-
 # With Sync.
 SERVICES_LIST1 = []
 
@@ -91,7 +90,7 @@ def _rentanadviser(song):
     service_name = "RentAnAdviser"
 
     search_url = "https://www.rentanadviser.com/en/subtitles/subtitles4songs.aspx?%s" % parse.urlencode({
-        "src":  f"{song.artist} {song.name}"
+        "src": f"{song.artist} {song.name}"
     })
     search_results = requests.get(search_url, proxies=Config.PROXY)
     soup = BeautifulSoup(search_results.text, 'html.parser')
@@ -318,16 +317,18 @@ def _versuri(song):
 @lyrics_service
 def _azapi(song):
     service = "Azapi"
-    try:
-        api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
-    except requests.exceptions.RequestException:
-        api = azapi.AZlyrics('google', accuracy=0.5, proxies=Config.PROXY)
+
+    api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
 
     if song.artist:
         api.artist = song.artist
         api.title = song.name
 
-        songs = api.getSongs()
+        try:
+            songs = api.getSongs()
+        except requests.exceptions.RequestException:
+            api.search_engine = 'google'
+            songs = api.getSongs()
 
         if song.name in songs:
             result_song = songs[song.name]
