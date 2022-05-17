@@ -107,11 +107,15 @@ def _rentanadviser(song):
                 event_validation = soup.find(id="__EVENTVALIDATION")["value"]
                 view_state = soup.find(id="__VIEWSTATE")["value"]
 
-                lrc = requests.post(url, {"__EVENTTARGET": "ctl00$ContentPlaceHolder1$btnlyrics",
-                                          "__EVENTVALIDATION": event_validation,
-                                          "__VIEWSTATE": view_state}, proxies=Config.PROXY).text
+                lrc = requests.post(possible_text.url,
+                                    {"__EVENTTARGET": "ctl00$ContentPlaceHolder1$btnlyrics",
+                                     "__EVENTVALIDATION": event_validation,
+                                     "__VIEWSTATE": view_state},
+                                    headers={"User-Agent": UA, "referer": possible_text.url},
+                                    proxies=Config.PROXY,
+                                    cookies=search_results.cookies)
 
-                return lrc, possible_text.url, service_name, True
+                return lrc.text, possible_text.url, service_name, True
 
 
 @lyrics_service(synced=True)
