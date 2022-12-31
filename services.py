@@ -193,13 +193,14 @@ def _rclyricsband(song):
                                   proxies=Config.PROXY)
     search_soup = BeautifulSoup(search_results.text, 'html.parser')
 
-    for result in search_soup.find(id="content").find_all("article"):
-        title_link = result.find(rel="bookmark")
+    for result in search_soup.find(id="main").find_all("article"):
+        title_link = result.find(class_="elementor-post__title").find("a")
         lower_title = title_link.get_text().lower()
         if song.artist.lower() in lower_title and song.name.lower() in lower_title:
             song_page = requests.get(title_link["href"])
             song_page_soup = BeautifulSoup(song_page.text, 'html.parser')
-            lyrics = requests.get(song_page_soup.find_all(class_="su-button")[2]["href"]).text
+            lrc_download_button = song_page_soup.find(lambda tag: tag.name == "a" and "LRC Download" in tag.text)
+            lyrics = requests.get(lrc_download_button["href"]).text
             return lyrics, song_page.url, service_name, True
 
 
