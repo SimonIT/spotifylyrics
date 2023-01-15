@@ -13,3 +13,4 @@ pathvalidate
 diskcache
 sentry-sdk
 azapi>=3.0.7
+setuptools>=65.5.1 # not directly required, pinned by Snyk to avoid a vulnerability
