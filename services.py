@@ -92,7 +92,7 @@ def _rentanadviser(song):
     search_url = "https://www.rentanadviser.com/en/subtitles/subtitles4songs.aspx?%s" % parse.urlencode({
         "src": f"{song.artist} {song.name}"
     })
-    search_results = requests.get(search_url, proxies=Config.PROXY)
+    search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
     soup = BeautifulSoup(search_results.text, 'html.parser')
     result_links = soup.find(id="tablecontainer").find_all("a")
 
@@ -101,7 +101,7 @@ def _rentanadviser(song):
             lower_title = result_link.get_text().lower()
             if song.artist.lower() in lower_title and song.name.lower() in lower_title:
                 url = f'https://www.rentanadviser.com/en/subtitles/{result_link["href"]}&type=lrc'
-                possible_text = requests.get(url, proxies=Config.PROXY)
+                possible_text = requests.get(url, proxies=Config.PROXY, headers={"User-Agent": UA})
                 soup = BeautifulSoup(possible_text.text, 'html.parser')
 
                 event_validation = soup.find(id="__EVENTVALIDATION")["value"]
