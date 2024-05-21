@@ -5,7 +5,7 @@ applescript>=2020.6.12; sys_platform == 'darwin'
 sip
 # PyQt6-stubs
 PyQt6
-requests>=2.20.0
+requests>=2.32.0
 psutil; sys_platform == 'win32'
 unidecode
 pylrc>=0.1.2
