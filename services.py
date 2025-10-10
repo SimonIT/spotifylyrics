@@ -1,5 +1,4 @@
 import codecs
-import functools
 import json
 import os
 import re
@@ -7,10 +6,32 @@ from urllib import request, parse
 
 import pathvalidate
 import requests
-import unidecode  # to remove accents
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+# import unidecode  # NOT NEEDED - only used by chord services (ultimateguitar, cifraclub, songsterr)
 from azapi import azapi
 from bs4 import BeautifulSoup
-from sentry_sdk import capture_exception
+
+# Configure requests with default timeout to prevent hangs
+DEFAULT_TIMEOUT = 10  # seconds
+
+class TimeoutHTTPAdapter(HTTPAdapter):
+    def __init__(self, timeout=None, *args, **kwargs):
+        self.timeout = timeout or DEFAULT_TIMEOUT
+        super().__init__(*args, **kwargs)
+    
+    def send(self, request, **kwargs):
+        if kwargs.get("timeout") is None:
+            kwargs["timeout"] = self.timeout
+        return super().send(request, **kwargs)
+
+# Apply timeout adapter to all requests
+http = requests.Session()
+http.mount("http://", TimeoutHTTPAdapter())
+http.mount("https://", TimeoutHTTPAdapter())
+# Replace requests.get with session get that has default timeout
+requests_get_original = requests.get
+requests.get = http.get
 
 try:
     import spotify_lyric.crawlers.QQCrawler as QQCrawler
@@ -18,20 +39,15 @@ try:
 except ModuleNotFoundError:
     pass
 
-# With Sync.
-SERVICES_LIST1 = []
-
-# Without Sync.
-SERVICES_LIST2 = []
-
 
 class Config:
+    ERROR = "Error: Could not find lyrics."
     PROXY = request.getproxies()
 
     if os.name == "nt":
-        SETTINGS_DIR = f"{os.getenv('APPDATA')}\\SpotifyLyrics\\"
+        SETTINGS_DIR = os.getenv("APPDATA") + "\\SpotifyLyrics\\"
     else:
-        SETTINGS_DIR = f"{os.path.expanduser('~')}/.SpotifyLyrics/"
+        SETTINGS_DIR = os.path.expanduser("~") + "/.SpotifyLyrics/"
     DEFAULT_LYRICS_DIR = os.path.join(SETTINGS_DIR, "lyrics")
     LYRICS_DIR = DEFAULT_LYRICS_DIR
 
@@ -39,33 +55,11 @@ class Config:
 UA = "Mozilla/5.0 (Maemo; Linux armv7l; rv:10.0.1) Gecko/20100101 Firefox/10.0.1 Fennec/10.0.1"
 
 
-def lyrics_service(_func=None, *, synced=False, enabled=True):
-    def _decorator_lyrics_service(func):
-        @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            try:
-                return func(*args, **kwargs)
-            except requests.exceptions.RequestException as error:
-                print("%s: %s" % (func.__name__, error))
-            except Exception as e:
-                capture_exception(e)
-
-        if enabled:
-            if synced:
-                SERVICES_LIST1.append(wrapper)
-            else:
-                SERVICES_LIST2.append(wrapper)
-        return wrapper
-
-    if _func is None:
-        return _decorator_lyrics_service
-    else:
-        return _decorator_lyrics_service(_func)
-
-
-@lyrics_service(synced=True)
 def _local(song):
     service_name = "Local"
+    url = ""
+    timed = False
+    lyrics = Config.ERROR
 
     if os.path.isdir(Config.LYRICS_DIR):
         path_song_name = pathvalidate.sanitize_filename(song.name.lower())
@@ -81,72 +75,96 @@ def _local(song):
                         with open(file, "r", encoding="UTF-8") as lyrics_file:
                             lyrics = lyrics_file.read()
                         timed = file_extension == ".lrc"
-                        url = f"file:///{os.path.abspath(file)}"
-                        return lyrics, url, service_name, timed
+                        url = "file:///" + os.path.abspath(file)
+                        break
+
+    return lyrics, url, service_name, timed
 
 
-@lyrics_service(synced=True)
 def _rentanadviser(song):
     service_name = "RentAnAdviser"
+    url = ""
 
     search_url = "https://www.rentanadviser.com/en/subtitles/subtitles4songs.aspx?%s" % parse.urlencode({
-        "src": f"{song.artist} {song.name}"
+        "src": song.artist + " " + song.name
     })
-    search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
-    soup = BeautifulSoup(search_results.text, 'html.parser')
-    result_links = soup.find(id="tablecontainer").find_all("a")
+    try:
+        search_results = requests.get(search_url, proxies=Config.PROXY)
+        soup = BeautifulSoup(search_results.text, 'html.parser')
+        result_links = soup.find(id="tablecontainer").find_all("a")
 
-    for result_link in result_links:
-        if result_link["href"] != "subtitles4songs.aspx":
-            lower_title = result_link.get_text().lower()
-            if song.artist.lower() in lower_title and song.name.lower() in lower_title:
-                url = f'https://www.rentanadviser.com/en/subtitles/{result_link["href"]}&type=lrc'
-                possible_text = requests.get(url, proxies=Config.PROXY, headers={"User-Agent": UA})
-                soup = BeautifulSoup(possible_text.text, 'html.parser')
+        for result_link in result_links:
+            if result_link["href"] != "subtitles4songs.aspx":
+                lower_title = result_link.get_text().lower()
+                if song.artist.lower() in lower_title and song.name.lower() in lower_title:
+                    url = "https://www.rentanadviser.com/en/subtitles/%s&type=lrc" % result_link["href"]
+                    break
 
-                event_validation = soup.find(id="__EVENTVALIDATION")["value"]
-                view_state = soup.find(id="__VIEWSTATE")["value"]
-
-                lrc = requests.post(possible_text.url,
-                                    {"__EVENTTARGET": "ctl00$ContentPlaceHolder1$btnlyrics",
-                                     "__EVENTVALIDATION": event_validation,
-                                     "__VIEWSTATE": view_state},
-                                    headers={"User-Agent": UA, "referer": possible_text.url},
-                                    proxies=Config.PROXY,
-                                    cookies=search_results.cookies)
-
-                return lrc.text, possible_text.url, service_name, True
-
-
-@lyrics_service(synced=True)
-def _megalobiz(song):
-    service_name = "Megalobiz"
-
-    search_url = "https://www.megalobiz.com/search/all?%s" % parse.urlencode({
-        "qry": f"{song.artist} {song.name}",
-        "display": "more"
-    })
-    search_results = requests.get(search_url, proxies=Config.PROXY)
-    soup = BeautifulSoup(search_results.text, 'html.parser')
-    result_links = soup.find(id="list_entity_container").find_all("a", class_="entity_name")
-
-    for result_link in result_links:
-        lower_title = result_link.get_text().lower()
-        if song.artist.lower() in lower_title and song.name.lower() in lower_title:
-            url = f"https://www.megalobiz.com{result_link['href']}"
+        if url:
             possible_text = requests.get(url, proxies=Config.PROXY)
             soup = BeautifulSoup(possible_text.text, 'html.parser')
 
-            lrc = soup.find("div", class_="lyrics_details").span.get_text()
+            event_validation = soup.find(id="__EVENTVALIDATION")["value"]
+            view_state = soup.find(id="__VIEWSTATE")["value"]
 
-            return lrc, possible_text.url, service_name, True
+            lrc = requests.post(url, {"__EVENTTARGET": "ctl00$ContentPlaceHolder1$btnlyrics",
+                                      "__EVENTVALIDATION": event_validation,
+                                      "__VIEWSTATE": view_state}, proxies=Config.PROXY).text
+
+            return lrc, url, service_name, True
+
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    return Config.ERROR, url, service_name, False
 
 
-@lyrics_service(synced=True, enabled=False)
+def _megalobiz(song):
+    service_name = "Megalobiz"
+    url = ""
+
+    search_url = "https://www.megalobiz.com/search/all?%s" % parse.urlencode({
+        "qry": song.artist + " " + song.name,
+        "display": "more"
+    })
+    try:
+        search_results = requests.get(search_url, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(search_results.text, 'html.parser')
+        
+        container = soup.find(id="list_entity_container")
+        if not container:
+            return Config.ERROR, url, service_name, False
+            
+        result_links = container.find_all("a", class_="entity_name")
+
+        for result_link in result_links:
+            lower_title = result_link.get_text().lower()
+            if song.artist.lower() in lower_title and song.name.lower() in lower_title:
+                url = "https://www.megalobiz.com%s" % result_link["href"]
+                break
+
+        if url:
+            possible_text = requests.get(url, proxies=Config.PROXY, timeout=10)
+            soup = BeautifulSoup(possible_text.text, 'html.parser')
+
+            lyrics_div = soup.find("div", class_="lyrics_details")
+            if lyrics_div and lyrics_div.span:
+                lrc = lyrics_div.span.get_text()
+                return lrc, url, service_name, True
+
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    return Config.ERROR, url, service_name, False
+
+
 def _qq(song):
-    qq = QQCrawler.QQCrawler()
-    sid = qq.getSongId(artist=song.artist, song=song.name)
-    url = qq.getLyticURI(sid)
+    url = ""
+    try:
+        qq = QQCrawler.QQCrawler()
+        sid = qq.getSongId(artist=song.artist, song=song.name)
+        url = qq.getLyticURI(sid)
+    except Exception as error:
+        print("%s: %s" % ("QQ", error))
+        return Config.ERROR, url, "QQ", False
 
     lrc_string = ""
     for line in requests.get(url, proxies=Config.PROXY).text.splitlines():
@@ -156,196 +174,586 @@ def _qq(song):
     return lrc_string, url, qq.name, True
 
 
-@lyrics_service(synced=True)
-def _lyricsify(song):
-    service_name = "Lyricsify"
+def _syair(song):
+    service_name = "Syair"
+    url = ""
 
-    search_url = "https://www.lyricsify.com/search?%s" % parse.urlencode({
-        "q": f"{song.artist} {song.name}"
+    search_url = "https://www.syair.info/search?%s" % parse.urlencode({
+        "q": song.artist + " " + song.name
     })
-    search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
-    soup = BeautifulSoup(search_results.text, 'html.parser')
+    try:
+        search_results = requests.get(search_url, proxies=Config.PROXY, headers={"User-Agent": UA})
+        soup = BeautifulSoup(search_results.text, 'html.parser')
 
-    result_container = soup.find("div", class_="sub")
+        result_container = soup.find("div", class_="sub")
 
-    if result_container:
-        result_list = result_container.find_all("div", class_="li")
+        if result_container:
+            result_list = result_container.find_all("div", class_="li")
 
-        if result_list:
-            for result in result_list:
-                result_link = result.find("a")
-                name = result_link.get_text().lower()
-                if song.artist.lower() in name and song.name.lower() in name:
-                    url = f"https://www.lyricsify.com{result_link['href']}?download"
+            if result_list:
+                for result in result_list:
+                    result_link = result.find("a")
+                    name = result_link.get_text().lower()
+                    if song.artist.lower() in name and song.name.lower() in name:
+                        url = "https://www.syair.info%s" % result_link["href"]
+                        break
+
+                if url:
                     lyrics_page = requests.get(url, proxies=Config.PROXY, headers={"User-Agent": UA})
                     soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+                    lrc_link = ""
+                    for download_link in soup.find_all("a"):
+                        if "download.php" in download_link["href"]:
+                            lrc_link = download_link["href"]
+                            break
+                    if lrc_link:
+                        lrc = requests.get("https://www.syair.info%s" % lrc_link, proxies=Config.PROXY,
+                                           cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
 
-                    download_link = soup.find(id="iframe_download")["src"]
-                    lrc = requests.get(download_link, proxies=Config.PROXY,
-                                       cookies=lyrics_page.cookies, headers={"User-Agent": UA}).text
-                    return lrc, lyrics_page.url, service_name, True
-
-
-@lyrics_service(synced=True)
-def _rclyricsband(song):
-    service_name = "RC Lyrics Band"
-    search_results = requests.get("https://rclyricsband.com/", params={"s": "%s %s" % (song.artist, song.name)},
-                                  proxies=Config.PROXY)
-    search_soup = BeautifulSoup(search_results.text, 'html.parser')
-
-    for result in search_soup.find(id="main").find_all("article"):
-        title_link = result.find(class_="elementor-post__title").find("a")
-        lower_title = title_link.get_text().lower()
-        if song.artist.lower() in lower_title and song.name.lower() in lower_title:
-            song_page = requests.get(title_link["href"])
-            song_page_soup = BeautifulSoup(song_page.text, 'html.parser')
-            lrc_download_button = song_page_soup.find(lambda tag: tag.name == "a" and "LRC Download" in tag.text)
-            lyrics = requests.get(lrc_download_button["href"]).text
-            return lyrics, song_page.url, service_name, True
+                        return lrc, url, service_name, True
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    return Config.ERROR, url, service_name, False
 
 
-@lyrics_service
 def _musixmatch(song):
     service_name = "Musixmatch"
+    url = ""
+    lyrics = Config.ERROR
 
     def extract_mxm_props(soup_page):
         scripts = soup_page.find_all("script")
+        props_script = None
         for script in scripts:
-            if script and script.contents and "__mxmProps" in script.contents[0]:
-                return script.contents[0]
+            if script and script.contents and len(script.contents) > 0 and "__mxmProps" in script.contents[0]:
+                props_script = script
+                break
+        if props_script and props_script.contents:
+            return props_script.contents[0]
+        return ""
 
-    search_url = "https://www.musixmatch.com/search/%s-%s" % (
-        song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
-    header = {"User-Agent": "curl/7.9.8 (i686-pc-linux-gnu) libcurl 7.9.8 (OpenSSL 0.9.6b) (ipv6 enabled)"}
-    search_results = requests.get(search_url, headers=header, proxies=Config.PROXY)
-    soup = BeautifulSoup(search_results.text, 'html.parser')
-    props = extract_mxm_props(soup)
-    if props:
-        page = re.findall('"track_share_url":"([^"]*)', props)
-        if page:
-            url = codecs.decode(page[0], 'unicode-escape')
-            lyrics_page = requests.get(url, headers=header, proxies=Config.PROXY)
-            soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-            props = extract_mxm_props(soup)
-            if '"body":"' in props:
-                lyrics = props.split('"body":"')[1].split('","language"')[0]
-                lyrics = lyrics.replace("\\n", "\n")
-                lyrics = lyrics.replace("\\", "")
-                album = soup.find(class_="mxm-track-footer__album")
-                if album:
-                    song.album = album.find(class_="mui-cell__title").getText()
-                if lyrics.strip():
-                    return lyrics, lyrics_page.url, service_name
+    try:
+        search_url = "https://www.musixmatch.com/search/%s-%s/tracks" % (
+            song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
+        header = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+        search_results = requests.get(search_url, headers=header, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(search_results.text, 'html.parser')
+        
+        props_content = extract_mxm_props(soup)
+        if props_content:
+            page = re.findall('"track_share_url":"([^"]*)', props_content)
+            if page:
+                url = codecs.decode(page[0], 'unicode-escape')
+                lyrics_page = requests.get(url, headers=header, proxies=Config.PROXY, timeout=10)
+                soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+                props = extract_mxm_props(soup)
+                if props and '"body":"' in props:
+                    lyrics = props.split('"body":"')[1].split('","language"')[0]
+                    lyrics = lyrics.replace("\\n", "\n")
+                    lyrics = lyrics.replace("\\", "")
+                    if not lyrics.strip():
+                        lyrics = Config.ERROR
+                    else:
+                        album = soup.find(class_="mxm-track-footer__album")
+                        if album:
+                            album_title = album.find(class_="mui-cell__title")
+                            if album_title:
+                                song.album = album_title.getText()
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    return lyrics, url, service_name
 
 
-@lyrics_service
 def _songmeanings(song):
     service_name = "Songmeanings"
-
-    search_url = "http://songmeanings.com/m/query/?q=%s %s" % (song.artist, song.name)
-    search_results = requests.get(search_url, proxies=Config.PROXY)
-    soup = BeautifulSoup(search_results.text, 'html.parser')
     url = ""
-    for link in soup.find_all('a', href=True):
-        if "songmeanings.com/m/songs/view/" in link['href']:
-            url = f"https:{link['href']}"
-            break
-        elif "/m/songs/view/" in link['href']:
-            result = f"https://songmeanings.com{link['href']}"
-            lyrics_page = requests.get(result, proxies=Config.PROXY)
-            soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-            url = lyrics_page.url
-            break
-    lis = soup.find_all('ul', attrs={'data-inset': True})
-    if len(lis) > 1:
-        lyrics = lis[1].find_all('li')[1].getText()
-        # lyrics = lyrics.encode('cp437', errors='replace').decode('utf-8', errors='replace')
-        if "We are currently missing these lyrics." not in lyrics:
-            return lyrics, url, service_name
+    lyrics = Config.ERROR
+    try:
+        search_url = "http://songmeanings.com/m/query/?q=%s %s" % (song.artist, song.name)
+        search_results = requests.get(search_url, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(search_results.text, 'html.parser')
+        url = ""
+        for link in soup.find_all('a', href=True):
+            if "songmeanings.com/m/songs/view/" in link['href']:
+                url = "https:" + link['href']
+                break
+            elif "/m/songs/view/" in link['href']:
+                result = "http://songmeanings.com" + link['href']
+                lyrics_page = requests.get(result, proxies=Config.PROXY, timeout=10)
+                soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+                url = "http://songmeanings.com" + link['href'][2:]
+                break
+        lis = soup.find_all('ul', attrs={'data-inset': True})
+        if len(lis) > 1:
+            li_items = lis[1].find_all('li')
+            if len(li_items) > 1:
+                temp_lyrics = li_items[1]
+                lyrics = temp_lyrics.getText()
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    if lyrics == "We are currently missing these lyrics.":
+        lyrics = Config.ERROR
+
+    # lyrics = lyrics.encode('cp437', errors='replace').decode('utf-8', errors='replace')
+    return lyrics, url, service_name
 
 
-@lyrics_service
 def _songlyrics(song):
     service_name = "Songlyrics"
-    artistm = song.artist.replace(" ", "-")
-    songm = song.name.replace(" ", "-")
-    url = f"https://www.songlyrics.com/{artistm}/{songm}-lyrics"
-    lyrics_page = requests.get(url, proxies=Config.PROXY)
-    soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-    lyrics_container = soup.find(id="songLyricsDiv")
-    if lyrics_container:
-        lyrics = lyrics_container.get_text()
-        if "Sorry, we have no" not in lyrics and "We do not have" not in lyrics:
-            title = soup.find("div", class_="pagetitle")
-            if title:
-                for info in title.find_all("p"):
-                    if "Album:" in info.get_text():
-                        song.album = info.find("a").get_text()
-                        break
-            return lyrics, lyrics_page.url, service_name
+    url = ""
+    try:
+        artistm = song.artist.replace(" ", "-")
+        songm = song.name.replace(" ", "-")
+        url = "https://www.songlyrics.com/%s/%s-lyrics" % (artistm, songm)
+        lyrics_page = requests.get(url, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+        
+        lyrics_div = soup.find(id="songLyricsDiv")
+        if lyrics_div:
+            lyrics = lyrics_div.get_text()
+            if "Sorry, we have no" in lyrics or "We do not have" in lyrics:
+                lyrics = Config.ERROR
+            else:
+                pagetitle = soup.find("div", class_="pagetitle")
+                if pagetitle:
+                    for info in pagetitle.find_all("p"):
+                        if "Album:" in info.get_text():
+                            album_link = info.find("a")
+                            if album_link:
+                                song.album = album_link.get_text()
+        else:
+            lyrics = Config.ERROR
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+        lyrics = Config.ERROR
+    return lyrics, url, service_name
 
 
-@lyrics_service
 def _genius(song):
     service_name = "Genius"
-    url = "https://genius.com/%s-%s-lyrics" % (song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
-    lyrics_page = requests.get(url, proxies=Config.PROXY)
-    soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-    lyrics_container = soup.find("div", {"class": "lyrics"})
-    if lyrics_container:
-        lyrics = lyrics_container.get_text()
-        if song.artist.lower().replace(" ", "") in soup.text.lower().replace(" ", ""):
-            return lyrics, lyrics_page.url, service_name
+    url = ""
+    lyrics = Config.ERROR
+    try:
+        # Updated to use the newer Genius HTML structure
+        url = "https://genius.com/%s-%s-lyrics" % (song.artist.replace(' ', '-'), song.name.replace(' ', '-'))
+        header = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"}
+        lyrics_page = requests.get(url, proxies=Config.PROXY, headers=header, timeout=10)
+        soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+        
+        # Try multiple possible div structures used by Genius
+        lyrics_divs = soup.find_all("div", {"data-lyrics-container": "true"})
+        if lyrics_divs:
+            lyrics_parts = []
+            for div in lyrics_divs:
+                lyrics_parts.append(div.get_text(separator="\n"))
+            lyrics = "\n".join(lyrics_parts)
+            
+            # Clean up Genius-specific artifacts
+            lyrics = lyrics.strip()
+            # Remove [Intro], [Verse], [Chorus] markers if desired
+            # lyrics = re.sub(r'\[.*?\]', '', lyrics)
+        else:
+            # Fallback to old method
+            lyrics_container = soup.find("div", {"class": "lyrics"})
+            if lyrics_container:
+                lyrics = lyrics_container.get_text()
+        
+        if lyrics and lyrics != Config.ERROR and lyrics.strip():
+            # Verify it's the right song by checking if artist appears somewhere
+            if song.artist.lower().replace(" ", "") not in soup.text.lower().replace(" ", ""):
+                lyrics = Config.ERROR
+        else:
+            lyrics = Config.ERROR
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    return lyrics, url, service_name
 
 
-@lyrics_service
 def _versuri(song):
     service_name = "Versuri"
-    search_url = "https://www.versuri.ro/q/%s+%s/" % \
-                 (song.artist.replace(" ", "+").lower(), song.name.replace(" ", "+").lower())
-    search_results = requests.get(search_url, proxies=Config.PROXY)
-    soup = BeautifulSoup(search_results.text, 'html.parser')
-    for search_results in soup.findAll('a'):
-        if "/versuri/" in search_results['href']:
-            link_text = search_results.getText().lower()
-            if song.artist.lower() in link_text and song.name.lower() in link_text:
-                url = "https://www.versuri.ro" + search_results['href']
-                lyrics_page = requests.get(url, proxies=Config.PROXY)
-                soup = BeautifulSoup(lyrics_page.text, 'html.parser')
-                content = soup.find_all('div', {'id': 'pagecontent'})[0]
-                lyrics = str(content)[str(content).find("</script><br/>") + 14:str(content).find("<br/><br/><center>")]
-                lyrics = lyrics.replace("<br/>", "")
-                if "nu există" not in lyrics:
-                    return lyrics, lyrics_page.url, service_name
+    url = ""
+    lyrics = Config.ERROR
+    try:
+        search_url = "https://www.versuri.ro/q/%s+%s/" % \
+                     (song.artist.replace(" ", "+").lower(), song.name.replace(" ", "+").lower())
+        search_results = requests.get(search_url, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(search_results.text, 'html.parser')
+        for search_results in soup.findAll('a'):
+            if "/versuri/" in search_results['href']:
+                link_text = search_results.getText().lower()
+                if song.artist.lower() in link_text and song.name.lower() in link_text:
+                    url = "https://www.versuri.ro" + search_results['href']
+                    break
+        if not url:
+            lyrics = Config.ERROR
+        else:
+            lyrics_page = requests.get(url, proxies=Config.PROXY, timeout=10)
+            soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+            content = soup.find_all('div', {'id': 'pagecontent'})[0]
+            lyrics = str(content)[str(content).find("</script><br/>") + 14:str(content).find("<br/><br/><center>")]
+            lyrics = lyrics.replace("<br/>", "")
+        if "nu există" in lyrics:
+            lyrics = Config.ERROR
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+        lyrics = Config.ERROR
+    return lyrics, url, service_name
 
 
-@lyrics_service
 def _azapi(song):
     service = "Azapi"
 
-    api = azapi.AZlyrics('duckduckgo', accuracy=0.5, proxies=Config.PROXY)
+    try:
+        try:
+            # azapi doesn't accept timeout parameter
+            api = azapi.AZlyrics('duckduckgo', accuracy=0.5)
+        except Exception:
+            try:
+                api = azapi.AZlyrics('google', accuracy=0.5)
+            except Exception:
+                return Config.ERROR, "", service
 
-    if song.artist:
+        if not song.artist:
+            return Config.ERROR, "", service
+
         api.artist = song.artist
         api.title = song.name
 
-        try:
-            songs = api.getSongs()
-        except requests.exceptions.RequestException:
-            api.search_engine = 'google'
-            songs = api.getSongs()
+        songs = api.getSongs()
 
         if song.name in songs:
             result_song = songs[song.name]
+        else:
+            return Config.ERROR, "", service
 
+        if result_song.get("album"):
             song.album = result_song["album"]
-            if result_song["year"]:
-                song.year = int(result_song["year"])
+        if result_song.get("year"):
+            song.year = int(result_song["year"])
 
-            lyrics = api.getLyrics(url=result_song["url"])
+        lyrics = api.getLyrics(url=result_song["url"])
+        
+        if not isinstance(lyrics, str) or not lyrics.strip():
+            return Config.ERROR, "", service
+            
+        return lyrics, result_song["url"], service
+    except Exception as error:
+        print("%s: %s" % (service, error))
+        return Config.ERROR, "", service
 
-            if isinstance(lyrics, str):
-                return lyrics, result_song["url"], service
+
+def _lyricsovh(song):
+    """Fetch lyrics from lyrics.ovh API - a free and reliable lyrics API"""
+    service_name = "Lyrics.ovh"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # lyrics.ovh API endpoint
+        api_url = "https://api.lyrics.ovh/v1/%s/%s" % (
+            parse.quote(song.artist), parse.quote(song.name)
+        )
+        
+        response = requests.get(api_url, proxies=Config.PROXY, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if "lyrics" in data and data["lyrics"]:
+                lyrics = data["lyrics"].strip()
+                url = api_url
+        
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
+
+
+def _chartlyrics(song):
+    """Fetch lyrics from ChartLyrics API - another free lyrics API"""
+    service_name = "ChartLyrics"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # ChartLyrics API endpoint
+        api_url = "http://api.chartlyrics.com/apiv1.asmx/SearchLyricDirect?%s" % parse.urlencode({
+            "artist": song.artist,
+            "song": song.name
+        })
+        
+        response = requests.get(api_url, proxies=Config.PROXY, timeout=10)
+        
+        if response.status_code == 200:
+            import xmltodict
+            data = xmltodict.parse(response.text)
+            
+            if "GetLyricResult" in data:
+                result = data["GetLyricResult"]
+                if result.get("Lyric"):
+                    lyrics = result["Lyric"].strip()
+                    if lyrics and lyrics != "":
+                        url = result.get("LyricUrl", api_url)
+        
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
+
+
+def _tekstowo(song):
+    """Fetch lyrics from Tekstowo.pl - large Polish/international lyrics database"""
+    service_name = "Tekstowo"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # Search for the song
+        search_url = "https://www.tekstowo.pl/szukaj.html"
+        search_data = {"search-artist": song.artist, "search-title": song.name}
+        
+        response = requests.post(search_url, data=search_data, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Find first result
+        results = soup.find_all("a", class_="title")
+        if results:
+            song_url = "https://www.tekstowo.pl" + results[0]["href"]
+            
+            # Get lyrics page
+            lyrics_page = requests.get(song_url, proxies=Config.PROXY, timeout=10)
+            soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+            
+            lyrics_div = soup.find("div", class_="song-text")
+            if lyrics_div:
+                lyrics = lyrics_div.get_text(separator="\n").strip()
+                url = song_url
+    
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
+
+
+def _letras(song):
+    """Fetch lyrics from Letras.mus.br - Brazilian lyrics site with international coverage"""
+    service_name = "Letras"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # Build URL - Letras uses artist/song format
+        artist_slug = song.artist.lower().replace(" ", "-").replace(".", "")
+        song_slug = song.name.lower().replace(" ", "-").replace(".", "")
+        url = f"https://www.letras.mus.br/{artist_slug}/{song_slug}/"
+        
+        response = requests.get(url, proxies=Config.PROXY, timeout=10)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            lyrics_div = soup.find("div", class_="lyric-original")
+            
+            if lyrics_div:
+                lyrics = lyrics_div.get_text(separator="\n").strip()
+    
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
+
+
+def _lyricscom(song):
+    """Fetch lyrics from Lyrics.com - large commercial lyrics database"""
+    service_name = "Lyrics.com"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # Lyrics.com requires proper headers to avoid 403
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://www.lyrics.com/'
+        }
+        
+        # Search for song
+        search_url = "https://www.lyrics.com/serp.php?%s" % parse.urlencode({
+            "st": f"{song.artist} {song.name}",
+            "qtype": "2"
+        })
+        
+        response = requests.get(search_url, headers=headers, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Find first result
+        results = soup.find_all("a", href=lambda x: x and "/lyric/" in x)
+        if results:
+            url = "https://www.lyrics.com" + results[0]["href"]
+            
+            # Get lyrics page
+            lyrics_page = requests.get(url, headers=headers, proxies=Config.PROXY, timeout=10)
+            soup = BeautifulSoup(lyrics_page.text, 'html.parser')
+            
+            lyrics_div = soup.find("pre", id="lyric-body-text")
+            if lyrics_div:
+                lyrics = lyrics_div.get_text().strip()
+    
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
+
+
+def _azlyrics(song):
+    """Direct scraper for AZLyrics.com - comprehensive lyrics database"""
+    service_name = "AZLyrics"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # AZLyrics requires specific URL format: lowercase, no spaces, no punctuation
+        artist = re.sub(r'[^a-z0-9]', '', song.artist.lower())
+        title = re.sub(r'[^a-z0-9]', '', song.name.lower())
+        
+        # Remove common prefixes
+        if artist.startswith('the'):
+            artist = artist[3:]
+        
+        url = f"https://www.azlyrics.com/lyrics/{artist}/{title}.html"
+        
+        # AZLyrics blocks requests without proper headers
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Referer': 'https://www.azlyrics.com/'
+        }
+        
+        response = requests.get(url, headers=headers, proxies=Config.PROXY, timeout=10)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # AZLyrics has lyrics in a div without class/id, right after comment <!-- Usage of azlyrics.com content -->
+            comments = soup.find_all(string=lambda text: isinstance(text, str) and 'Usage of azlyrics.com content' in text)
+            if comments:
+                lyrics_div = comments[0].find_next('div')
+                if lyrics_div:
+                    lyrics_text = lyrics_div.get_text().strip()
+                    # Only accept if we actually got lyrics (not empty)
+                    if lyrics_text and len(lyrics_text) > 50:  # Minimum lyrics length
+                        lyrics = lyrics_text
+    
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
+
+
+def _lyricalnonsense(song):
+    """Lyrical Nonsense - Excellent for Japanese songs with romaji/translation"""
+    service_name = "Lyrical-Nonsense"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # Search for the song
+        search_url = "https://www.lyrical-nonsense.com/global/search/"
+        params = {
+            'q': f"{song.artist} {song.name}"
+        }
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        search_response = requests.get(search_url, params=params, headers=headers, proxies=Config.PROXY, timeout=10)
+        soup = BeautifulSoup(search_response.text, 'html.parser')
+        
+        # Find first result link
+        result_link = soup.find('a', href=lambda x: x and '/lyrics/' in x)
+        if result_link:
+            href = result_link['href']
+            # Check if href is relative or absolute
+            if href.startswith('http'):
+                url = href
+            else:
+                url = "https://www.lyrical-nonsense.com" + href
+            
+            # Get lyrics page
+            lyrics_response = requests.get(url, headers=headers, proxies=Config.PROXY, timeout=10)
+            lyrics_soup = BeautifulSoup(lyrics_response.text, 'html.parser')
+            
+            # Try to get romaji version first (for Japanese songs)
+            romaji_div = lyrics_soup.find('div', id='Romaji')
+            if romaji_div:
+                lyrics_pre = romaji_div.find('pre', class_='olyrictext')
+                if lyrics_pre:
+                    lyrics = lyrics_pre.get_text().strip()
+            
+            # If no romaji, try original lyrics
+            if lyrics == Config.ERROR:
+                original_div = lyrics_soup.find('div', id='Original')
+                if original_div:
+                    lyrics_pre = original_div.find('pre', class_='olyrictext')
+                    if lyrics_pre:
+                        lyrics = lyrics_pre.get_text().strip()
+    
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
+
+
+def _geniusromaji(song):
+    """Try to get romanized version from Genius (for Japanese/Korean songs)"""
+    service_name = "Genius-Romaji"
+    lyrics = Config.ERROR
+    url = ""
+    
+    try:
+        # Search with "romanized" keyword
+        search_url = "https://genius.com/api/search/multi?q=%s" % parse.quote(f"{song.artist} {song.name} romanized")
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'application/json'
+        }
+        
+        response = requests.get(search_url, headers=headers, proxies=Config.PROXY, timeout=10)
+        data = response.json()
+        
+        # Find song with "Romanized" in title
+        if 'response' in data and 'sections' in data['response']:
+            for section in data['response']['sections']:
+                if section.get('type') == 'song':
+                    for hit in section.get('hits', []):
+                        result = hit.get('result', {})
+                        title = result.get('title', '')
+                        if 'romanized' in title.lower() or 'romaji' in title.lower():
+                            url = result.get('url', '')
+                            break
+                    if url:
+                        break
+        
+        # Get lyrics from the romanized version page
+        if url:
+            lyrics_response = requests.get(url, headers={'User-Agent': headers['User-Agent']}, 
+                                          proxies=Config.PROXY, timeout=10)
+            soup = BeautifulSoup(lyrics_response.text, 'html.parser')
+            
+            # Try new Genius format with data-lyrics-container
+            lyrics_containers = soup.find_all('div', attrs={'data-lyrics-container': 'true'})
+            if lyrics_containers:
+                lyrics_parts = []
+                for container in lyrics_containers:
+                    lyrics_parts.append(container.get_text(separator='\n').strip())
+                lyrics = '\n\n'.join(lyrics_parts)
+    
+    except Exception as error:
+        print("%s: %s" % (service_name, error))
+    
+    return lyrics, url, service_name
 
 
 # tab/chord services
@@ -384,8 +792,8 @@ def _cifraclub(song):
 
     try:
         result = requests.get(url, proxies=Config.PROXY)
-    except requests.exceptions.RequestException as error:
-        print(f"cifraclub: {error}")
+    except Exception as error:
+        print("cifraclub: %s" % error)
         return []
 
     if result.status_code == 200:
@@ -399,7 +807,7 @@ def _cifraclub(song):
 def _songsterr(song):
     artist = unidecode.unidecode(song.artist)
     title = unidecode.unidecode(song.name)
-    url = 'https://www.songsterr.com/a/wa/bestMatchForQueryString?s={}&a={}'.format(title, artist)
+    url = 'http://www.songsterr.com/a/wa/bestMatchForQueryString?s={}&a={}'.format(title, artist)
     return [url]
 
 
@@ -462,10 +870,8 @@ def _tanzmusikonline(song):
                             song.cycles_per_minute = int(text)
                         elif "fa-tachometer" in classes:
                             song.beats_per_minute = int(text)
-    except requests.exceptions.RequestException as error:
+    except Exception as error:
         print("%s: %s" % ("Tanzmusik Online", error))
-    except Exception as e:
-        capture_exception(e)
 
 
 def _welchertanz(song):
@@ -492,7 +898,5 @@ def _welchertanz(song):
                             .replace("Foxtrott", "Foxtrot")
                         if dance_name != "---" and dance_name not in song.dances:
                             song.dances.append(dance_name)
-    except requests.exceptions.RequestException as error:
+    except Exception as error:
         print("%s: %s" % ("Tanzschule Woelbing", error))
-    except Exception as e:
-        capture_exception(e)

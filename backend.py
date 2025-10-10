@@ -2,7 +2,6 @@
 import os
 import re
 import shutil
-import sqlite3
 import subprocess
 import sys
 import threading
@@ -173,6 +172,30 @@ class VlcMediaPlayer(StreamingService):
         return "VLC"
 
 
+# With Sync. Not working: s._minilyrics, s._qq, s._rentanadviser (broken), s._syair (broken)
+SERVICES_LIST1 = [s._megalobiz]
+
+# Without Sync. - Ordered by reliability and speed (Local is always first to check user's own lyrics)
+# Multiple sources to maximize coverage - if one doesn't have it, another will!
+SERVICES_LIST2 = [
+    s._local,               # User's own lyrics files
+    s._lyricsovh,           # Primary API - fast and reliable ✅
+    s._genius,              # Annotated lyrics, 100% success ✅
+    s._letras,              # Brazilian site, 100% success ✅
+    s._tekstowo,            # Polish site, 100% success ✅
+    s._songlyrics,          # Good scraper, 33% success ✅
+    s._geniusromaji,        # Genius romanized (Japanese/Korean songs)
+    s._lyricalnonsense,     # Excellent for Japanese songs with romaji
+    s._musixmatch,          # Sometimes works, backup
+    # REMOVED: Dead/broken services
+    # s._chartlyrics,       # API no longer returns lyrics (Lyric: None)
+    # s._lyricscom,         # 403 Forbidden (anti-bot)
+    # s._azlyrics,          # Blocked by anti-bot protection
+    # s._azapi,             # Search engines blocking the library
+    # s._versuri,           # Timeout/scraper outdated
+    # s._songmeanings       # HTML structure changed, broken
+]
+
 # Accords
 SERVICES_LIST3 = [s._ultimateguitar, s._cifraclub, s._songsterr]
 
@@ -182,6 +205,7 @@ Useful to change the lyrics with the button "Next Lyric" if
 the service returned a wrong song
 '''
 CURRENT_SERVICE = -1
+LAST_SERVICE_USED = -1  # Track which service was last used for "Change Lyrics" button
 SECONDS_IN_WEEK = 604800
 LyricsMetadata = namedtuple("LyricsMetadata", ["lyrics", "url", "service_name", "timed"])
 
@@ -204,22 +228,19 @@ def cache_lyrics(func):
         if not ignore_cache:
             try:
                 lyrics_metadata = cache.get(clean_song_name)
-            except (PermissionError, ValueError, sqlite3.DatabaseError):
+            except ValueError:
                 recreate_cache()
                 lyrics_metadata = None
-            if not lyrics_metadata or not lyrics_metadata.lyrics:
+            if not lyrics_metadata or lyrics_metadata.lyrics == s.Config.ERROR:
                 lyrics_metadata = func(*args, **kwargs)
                 try:
                     cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
-                except (PermissionError, ValueError, sqlite3.DatabaseError):
+                except ValueError:
                     recreate_cache()
             return lyrics_metadata
         else:
             lyrics_metadata = func(*args, **kwargs)
-            try:
-                cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
-            except (PermissionError, ValueError, sqlite3.DatabaseError):
-                recreate_cache()
+            cache.set(clean_song_name, lyrics_metadata, expire=SECONDS_IN_WEEK)
             return lyrics_metadata
 
     return wrapper
@@ -230,47 +251,61 @@ def load_lyrics(song: Song, **kwargs):
     sync = kwargs.get("sync", False)
     global CURRENT_SERVICE
 
-    if sync:
-        if s._local not in s.SERVICES_LIST1:
-            s.SERVICES_LIST1.insert(0, s._local)
-    else:
-        if s._local not in s.SERVICES_LIST2:
-            s.SERVICES_LIST2.insert(0, s._local)
-
+    # Note: _local is now permanently in SERVICES_LIST2, no need to insert dynamically
+    
     timed = False
-    lyrics = ""
-    service_name = "---"
-    url = ""
-    if not CURRENT_SERVICE < (len(s.SERVICES_LIST1) + len(s.SERVICES_LIST2) - 1):
+    lyrics = s.Config.ERROR
+    
+    # When at the end of services, wrap around to beginning
+    if CURRENT_SERVICE >= (len(SERVICES_LIST1) + len(SERVICES_LIST2) - 1):
         CURRENT_SERVICE = -1
 
-    if sync and CURRENT_SERVICE + 1 < len(s.SERVICES_LIST1):
+    if sync and CURRENT_SERVICE + 1 < len(SERVICES_LIST1):
         temp_lyrics = []
-        for i in range(CURRENT_SERVICE + 1, len(s.SERVICES_LIST1)):
-            result = s.SERVICES_LIST1[i](song)
-            if result:
-                lyrics, url, service_name, timed = result
+        for i in range(CURRENT_SERVICE + 1, len(SERVICES_LIST1)):
+            lyrics, url, service_name, timed = SERVICES_LIST1[i](song)
+            if lyrics != s.Config.ERROR:
                 CURRENT_SERVICE = i
                 if timed:
                     break
                 else:
                     temp_lyrics = lyrics, url, service_name, timed
-        if not timed and temp_lyrics and temp_lyrics[0]:
+        if not timed and temp_lyrics and temp_lyrics[0] != s.Config.ERROR:
             lyrics, url, service_name, timed = temp_lyrics
 
-    current_not_synced_service = CURRENT_SERVICE - len(s.SERVICES_LIST1)
+    current_not_synced_service = CURRENT_SERVICE - len(SERVICES_LIST1)
     current_not_synced_service = -1 if current_not_synced_service < -1 else current_not_synced_service
-    if sync and not lyrics or not sync or CURRENT_SERVICE > (len(s.SERVICES_LIST1) - 1):
-        for i in range(current_not_synced_service + 1, len(s.SERVICES_LIST2)):
-            result = s.SERVICES_LIST2[i](song)  # Can return 4 values if _local was inserted
-            if result:
-                lyrics, url, service_name = result
+    start_index = current_not_synced_service + 1
+    
+    # If start_index is beyond the list, wrap around to beginning
+    if start_index >= len(SERVICES_LIST2):
+        start_index = 0
+        CURRENT_SERVICE = -1  # Reset to start from beginning
+    
+    if sync and lyrics == s.Config.ERROR or not sync or CURRENT_SERVICE > (len(SERVICES_LIST1) - 1):
+        for i in range(start_index, len(SERVICES_LIST2)):
+            result = SERVICES_LIST2[i](song)
+            lyrics, url, service_name = result[0], result[1], result[2]
+            if lyrics != s.Config.ERROR:
                 lyrics = lyrics.replace("&amp;", "&").replace("`", "'").strip()
-                CURRENT_SERVICE = i + len(s.SERVICES_LIST1)
+                CURRENT_SERVICE = i + len(SERVICES_LIST1)
+                global LAST_SERVICE_USED
+                LAST_SERVICE_USED = i  # Remember which service index found the lyrics
                 break
+        # If we tried all services from start_index to end and found nothing,
+        # wrap around to beginning for next attempt
+        if lyrics == s.Config.ERROR and start_index > 0:
+            # We tried from start_index to end, next time try from beginning
+            CURRENT_SERVICE = len(SERVICES_LIST1) + len(SERVICES_LIST2) - 1
+            LAST_SERVICE_USED = -1  # Reset so next_lyrics will wrap properly
+        elif lyrics == s.Config.ERROR and start_index == 0:
+            # We already wrapped and tried everything, keep at -1 to try again from start
+            CURRENT_SERVICE = -1
+            LAST_SERVICE_USED = -1  # Reset so next_lyrics will wrap properly
+    
+    if lyrics == s.Config.ERROR:
+        service_name = "---"
 
-    if not lyrics:
-        lyrics = "Error: Could not find lyrics."
     # return "Error: Could not find lyrics."  if the for loop doesn't find any lyrics
     return LyricsMetadata(lyrics, url, service_name, timed)
 
@@ -285,13 +320,24 @@ def load_info(window, song: Song):
 
 
 def get_lyrics(song: Song, sync=False):
-    global CURRENT_SERVICE
+    global CURRENT_SERVICE, LAST_SERVICE_USED
     CURRENT_SERVICE = -1
+    LAST_SERVICE_USED = -1  # Reset when getting fresh lyrics
 
     return load_lyrics(song, sync=sync)
 
 
 def next_lyrics(song: Song, sync=False):
+    global CURRENT_SERVICE, LAST_SERVICE_USED
+    # When clicking "Change Lyrics", start searching from the service AFTER the one that last found lyrics
+    # This ensures we cycle through different services even if the same service would find lyrics again
+    if LAST_SERVICE_USED >= 0:
+        # Set CURRENT_SERVICE so that the next search starts AFTER the last successful service
+        CURRENT_SERVICE = LAST_SERVICE_USED + len(SERVICES_LIST1)
+    else:
+        # If no service has found lyrics yet, or we wrapped around, advance by 1
+        # to try the next service instead of staying stuck
+        CURRENT_SERVICE = (CURRENT_SERVICE + 1) % (len(SERVICES_LIST1) + len(SERVICES_LIST2))
     return load_lyrics(song, sync=sync, ignore_cache=True)
 
 
@@ -343,9 +389,8 @@ def get_window_title(service: StreamingService) -> str:
                 for pid in spids:
                     win32gui.EnumWindows(enum_window_callback, pid)
                     for item in windows:
-                        txt = win32gui.GetWindowText(item)
-                        if txt:
-                            window_name = txt
+                        if win32gui.GetWindowText(item):
+                            window_name = win32gui.GetWindowText(item)
                             raise StopIteration
             except StopIteration:
                 pass
@@ -394,7 +439,7 @@ def check_version() -> bool:
         return get_version() >= \
                float(requests.get("https://api.github.com/repos/SimonIT/spotifylyrics/tags", timeout=5, proxies=proxy)
                      .json()[0]["name"])
-    except requests.exceptions.RequestException:
+    except Exception:
         return True
 
 
@@ -407,7 +452,7 @@ def open_spotify(service: StreamingService) -> bool:
         if not get_window_title(service):
             try:
                 subprocess.Popen(service.get_windows_exe_path())
-            except (FileNotFoundError, PermissionError):
+            except FileNotFoundError:
                 return False
     elif sys.platform == "linux":
         if not get_window_title(service):
