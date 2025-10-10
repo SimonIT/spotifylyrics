@@ -13,9 +13,8 @@ import webbrowser
 import pathvalidate
 import pylrc
 import sentry_sdk
-from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QSystemTrayIcon, QMenu, QApplication, QMessageBox
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtWidgets import QSystemTrayIcon, QAction, QMenu, qApp, QMessageBox
 
 import backend
 from services import Config
@@ -36,7 +35,7 @@ class LyricsTextBrowserWidget(QtWidgets.QTextBrowser):
     def wheelEvent(self, e):
         try:
             modifiers = e.modifiers()
-            if modifiers == QtCore.Qt.KeyboardModifier.ControlModifier:
+            if modifiers == QtCore.Qt.ControlModifier:
                 num_pixels = e.pixelDelta()
                 num_degrees = e.angleDelta()
                 factor = 1
@@ -90,10 +89,8 @@ class UiForm:
         self.label_song_name = QtWidgets.QLabel(FORM)
         self.label_song_name.setObjectName("label_song_name")
         self.label_song_name.setOpenExternalLinks(True)
-        self.horizontal_layout_2.addWidget(self.label_song_name, 0,
-                                           QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
-        spacer_item = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding,
-                                            QtWidgets.QSizePolicy.Policy.Minimum)
+        self.horizontal_layout_2.addWidget(self.label_song_name, 0, QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        spacer_item = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontal_layout_2.addItem(spacer_item)
 
         self.streaming_services_box = QtWidgets.QComboBox(FORM)
@@ -102,29 +99,26 @@ class UiForm:
         self.streaming_services_box.setCurrentIndex(0)
         self.streaming_services_box.currentIndexChanged.connect(self.options_changed)
         self.horizontal_layout_2.addWidget(self.streaming_services_box, 0,
-                                           QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+                                           QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         self.change_lyrics_button = QtWidgets.QPushButton(FORM)
         self.change_lyrics_button.setObjectName("pushButton")
         self.change_lyrics_button.setText("Change Lyrics")
         self.change_lyrics_button.clicked.connect(self.change_lyrics)
-        self.horizontal_layout_2.addWidget(self.change_lyrics_button, 0,
-                                           QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        self.horizontal_layout_2.addWidget(self.change_lyrics_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         self.save_button = QtWidgets.QPushButton(FORM)
         self.save_button.setObjectName("saveButton")
         self.save_button.setText("Save Lyrics")
         self.save_button.clicked.connect(self.save_lyrics)
-        self.horizontal_layout_2.addWidget(self.save_button, 0,
-                                           QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        self.horizontal_layout_2.addWidget(self.save_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         # Open Tab Button
         self.chords_button = QtWidgets.QPushButton(FORM)
         self.chords_button.setObjectName("chordsButton")
         self.chords_button.setText("Chords")
         self.chords_button.clicked.connect(self.get_chords)
-        self.horizontal_layout_2.addWidget(self.chords_button, 0,
-                                           QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        self.horizontal_layout_2.addWidget(self.chords_button, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         self.options_combobox = QtWidgets.QComboBox(FORM)
         self.options_combobox.setGeometry(QtCore.QRect(160, 120, 69, 22))
@@ -144,7 +138,7 @@ class UiForm:
         show_action = QAction("Show", FORM)
         quit_action = QAction("Exit", FORM)
         show_action.triggered.connect(FORM.show)
-        quit_action.triggered.connect(QApplication.quit)
+        quit_action.triggered.connect(qApp.quit)
         tray_menu = QMenu()
         tray_menu.addAction(show_action)
         tray_menu.addAction(quit_action)
@@ -154,15 +148,13 @@ class UiForm:
 
         if os.name == "nt":
             self.options_combobox.addItem("")
-        self.horizontal_layout_2.addWidget(self.options_combobox, 0,
-                                           QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        self.horizontal_layout_2.addWidget(self.options_combobox, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         self.font_size_box = QtWidgets.QSpinBox(FORM)
         self.font_size_box.setMinimum(1)
         self.font_size_box.setProperty("value", 10)
         self.font_size_box.setObjectName("fontBox")
-        self.horizontal_layout_2.addWidget(self.font_size_box, 0,
-                                           QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+        self.horizontal_layout_2.addWidget(self.font_size_box, 0, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         self.vertical_layout_2.addLayout(self.horizontal_layout_2)
         self.sync_adjustment_slider = QtWidgets.QSlider(FORM)
         self.sync_adjustment_slider.setInvertedAppearance(True)
@@ -197,11 +189,6 @@ class UiForm:
         QtCore.QMetaObject.connectSlotsByName(FORM)
         FORM.setTabOrder(self.text_browser, self.options_combobox)
         FORM.setTabOrder(self.options_combobox, self.font_size_box)
-
-        self.current_line_size_ratio = 1.25
-        self.current_line_style = {
-            "font-size": f"{self.current_line_size_ratio * self.font_size_box.value()}pt"
-        }
 
         self.set_style()
         self.load_save_settings()
@@ -277,7 +264,7 @@ class UiForm:
             if self.sync:
                 self.options_combobox.setItemText(2, "Synced Lyrics (on)")
             if self.ontop:
-                FORM.setWindowFlags(FORM.windowFlags() | QtCore.Qt.WindowType.WindowStaysOnTopHint)
+                FORM.setWindowFlags(FORM.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
                 self.options_combobox.setItemText(3, "Always on Top (on)")
                 FORM.show()
             if self.open_spotify:
@@ -343,11 +330,11 @@ class UiForm:
             self.sync = not self.sync
         elif current_index == 3:
             if self.ontop is False:
-                FORM.setWindowFlags(FORM.windowFlags() | QtCore.Qt.WindowType.WindowStaysOnTopHint)
+                FORM.setWindowFlags(FORM.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
                 self.options_combobox.setItemText(3, "Always on Top (on)")
                 FORM.show()
             else:
-                FORM.setWindowFlags(FORM.windowFlags() & ~QtCore.Qt.WindowType.WindowStaysOnTopHint)
+                FORM.setWindowFlags(FORM.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
                 self.options_combobox.setItemText(3, "Always on Top")
                 FORM.show()
             self.ontop = not self.ontop
@@ -386,7 +373,7 @@ class UiForm:
         self.load_save_settings(save=True)
 
     def set_style(self):
-        self.lyrics_text_align = QtCore.Qt.AlignmentFlag.AlignLeft
+        self.lyrics_text_align = QtCore.Qt.AlignLeft
         if os.path.exists(Config.SETTINGS_DIR + "theme.ini"):
             theme_file = Config.SETTINGS_DIR + "theme.ini"
         else:
@@ -400,34 +387,34 @@ class UiForm:
         style_config = configparser.ConfigParser()
 
         with open(theme_file, 'r') as theme:
-            style_config.read_string(f"[{section}]\n{theme.read()}")
+            style_config.read_string("[%s]\n%s" % (section, theme.read()))
 
         align = style_config.get(section, "lyricstextalign", fallback="")
         if align:
             if align == "center":
-                self.lyrics_text_align = QtCore.Qt.AlignmentFlag.AlignCenter
+                self.lyrics_text_align = QtCore.Qt.AlignCenter
             elif align == "right":
-                self.lyrics_text_align = QtCore.Qt.AlignmentFlag.AlignRight
+                self.lyrics_text_align = QtCore.Qt.AlignRight
 
         FORM.setWindowOpacity(style_config.getfloat(section, "windowopacity", fallback=1))
 
         background = style_config.get(section, "backgroundcolor", fallback="")
         if background:
-            FORM.setStyleSheet(f"background-color: {background};")
+            FORM.setStyleSheet("background-color: %s;" % background)
 
         style = self.text_browser.styleSheet()
 
         text_background = style_config.get(section, "lyricsbackgroundcolor", fallback="")
         if text_background:
-            style = f"{style}background-color: {text_background};"
+            style = style + "background-color: %s;" % text_background
 
         text_color = style_config.get(section, "lyricstextcolor", fallback="")
         if text_color:
-            style = f"{style}color: %s;" % text_color
+            style = style + "color: %s;" % text_color
 
         text_font = style_config.get(section, "lyricsfont", fallback="")
         if text_font:
-            style = f"{style}font-family: \"{text_font}\";"
+            style = style + "font-family: \"%s\";" % text_font
 
         self.text_browser.setStyleSheet(style)
 
@@ -436,12 +423,12 @@ class UiForm:
         label_color = style_config.get(section, "songnamecolor", fallback="")
         if label_color:
             style = style + "color: %s;" % label_color
-            text = re.sub("color:.*?;", f"color: {label_color};", self.label_song_name.text())
+            text = re.sub("color:.*?;", "color: %s;" % label_color, self.label_song_name.text())
             self.label_song_name.setText(text)
 
         label_underline = style_config.getboolean(section, "songnameunderline", fallback=False)
         if label_underline:
-            style = f"{style}text-decoration: underline;"
+            style = style + "text-decoration: underline;"
 
         self.label_song_name.setStyleSheet(style)
 
@@ -449,11 +436,11 @@ class UiForm:
 
         font_size_background = style_config.get(section, "fontboxbackgroundcolor", fallback="")
         if font_size_background:
-            style = f"{style}background-color: {font_size_background};"
+            style = style + "background-color: %s;" % font_size_background
 
         font_size_color = style_config.get(section, "fontboxtextcolor", fallback="")
         if font_size_color:
-            style = f"{style}color: {font_size_color};"
+            style = style + "color: %s;" % font_size_color
 
         self.streaming_services_box.setStyleSheet(style)
         self.options_combobox.setStyleSheet(style)
@@ -461,13 +448,6 @@ class UiForm:
         self.change_lyrics_button.setStyleSheet(style)
         self.save_button.setStyleSheet(style)
         self.chords_button.setStyleSheet(style)
-
-        self.current_line_size_ratio = style_config.getfloat(section, "currentLineSizeRatio", fallback=1.25)
-        self.current_line_style["font-size"] = f"{self.current_line_size_ratio * self.font_size_box.value()}pt"
-
-        current_line_background_color = style_config.get(section, "currentLineBackgroundColor", fallback="")
-        if current_line_background_color:
-            self.current_line_style["background-color"] = current_line_background_color
 
     def set_dark_theme(self):
         self.dark_theme = True
@@ -509,15 +489,14 @@ class UiForm:
         style = self.text_browser.styleSheet()
         style = style.replace('%s' % style[style.find("font"):style.find("pt;") + 3], '')
         style = style.replace('p ', '')
-        self.text_browser.setStyleSheet(f"{style}p font-size: {self.font_size_box.value() * 2}pt;")
+        self.text_browser.setStyleSheet(style + "p font-size: %spt;" % self.font_size_box.value() * 2)
         lyrics = self.text_browser.toPlainText()
         self.set_lyrics_with_alignment(lyrics)
-        self.current_line_style["font-size"] = f"{self.current_line_size_ratio * self.font_size_box.value()}pt"
         self.load_save_settings(save=True)
 
     def retranslate_ui(self, form):
         _translate = QtCore.QCoreApplication.translate
-        form.setWindowTitle(_translate("Form", f"Spotify Lyrics - {backend.get_version()}"))
+        form.setWindowTitle(_translate("Form", "Spotify Lyrics - {}".format(backend.get_version())))
         form.setWindowIcon(QtGui.QIcon(self.get_resource_path('icon.png')))
         if backend.check_version():
             self.label_song_name.setText(_translate("Form", "Spotify Lyrics"))
@@ -529,15 +508,15 @@ class UiForm:
                                                     "update)</sup></a>"))
             update_dialog = QMessageBox()
             update_dialog.setWindowIcon(FORM.windowIcon())
-            update_dialog.setIcon(QMessageBox.Icon.Information)
+            update_dialog.setIcon(QMessageBox.Information)
 
             update_dialog.setText("A newer version of SpotifyLyrics is available!")
             update_dialog.setInformativeText("Do you want to download the newer version?")
             update_dialog.setWindowTitle("Update available")
-            update_dialog.setStandardButtons(QMessageBox.StandardButton.Open | QMessageBox.StandardButton.Close)
+            update_dialog.setStandardButtons(QMessageBox.Open | QMessageBox.Close)
 
             update_result = update_dialog.exec()
-            if update_result == QMessageBox.StandardButton.Open:
+            if update_result == QMessageBox.Open:
                 webbrowser.open("https://github.com/SimonIT/spotifylyrics/releases")
         self.text_browser.setText(_translate("Form", "Play a song in Spotify to fetch lyrics."))
         self.font_size_box.setToolTip(_translate("Form", "Font Size"))
@@ -614,8 +593,8 @@ class UiForm:
                                 line_changed = True
                             if line_changed:
                                 lrc[count - 1].text = HTML_TAGS.sub("", lrc[count - 1].text)
-                                lrc[count].text = \
-                                    f"<b style=\"{self.dict_to_style(self.current_line_style)}\">{lrc[count].text}</b>"
+                                lrc[count].text = """<b style="font-size: %spt">%s</b>""" % \
+                                                  (self.font_size_box.value() * 1.25, lrc[count].text)
                                 if count - 2 > 0:
                                     lrc[count - 3].text = HTML_TAGS.sub("", lrc[count - 3].text)
                                     lrc[count - 2].text = "<a name=\"#scrollHere\">%s</a>" % lrc[count - 2].text
@@ -737,23 +716,23 @@ class UiForm:
                     if name.lower() in file_name and artist.lower() in file_name:
                         save_dialog = QMessageBox()
                         save_dialog.setWindowIcon(FORM.windowIcon())
-                        save_dialog.setIcon(QMessageBox.Icon.Information)
+                        save_dialog.setIcon(QMessageBox.Information)
 
                         save_dialog.setText("You got already saved lyrics for the song %s by %s!" %
                                             (self.song.name, self.song.artist))
                         save_dialog.setInformativeText("Do you want overwrite them?")
                         save_dialog.setWindowTitle("Lyrics already saved")
-                        save_dialog.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                        save_dialog.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
 
                         save_anyway = save_dialog.exec()
-                        if save_anyway == QMessageBox.StandardButton.Yes:
+                        if save_anyway == QMessageBox.Yes:
                             new_lyrics_file_name = file_parts[0]
                             break
                         else:
                             return
 
         if not new_lyrics_file_name:
-            new_lyrics_file_name = os.path.join(Config.LYRICS_DIR, f"{artist} - {name}")
+            new_lyrics_file_name = os.path.join(Config.LYRICS_DIR, "%s - %s" % (artist, name))
 
         text = self.lyrics
         if self.timed:
@@ -774,18 +753,11 @@ class UiForm:
         if not backend.open_spotify(self.get_current_streaming_service()):
             save_dialog = QMessageBox()
             save_dialog.setWindowIcon(FORM.windowIcon())
-            save_dialog.setIcon(QMessageBox.Icon.Warning)
+            save_dialog.setIcon(QMessageBox.Warning)
 
             save_dialog.setText("Couldn't open %s!" % str(self.get_current_streaming_service()))
-            save_dialog.setStandardButtons(QMessageBox.StandardButton.Ok)
+            save_dialog.setStandardButtons(QMessageBox.Ok)
             save_dialog.exec()
-
-    @classmethod
-    def dict_to_style(cls, dictionary: dict) -> str:
-        style = ""
-        for key, value in dictionary.items():
-            style = f"{style}{key}: {value};"
-        return style
 
 
 class FormWidget(QtWidgets.QWidget):
@@ -799,7 +771,7 @@ class FormWidget(QtWidgets.QWidget):
             self.hide()
 
     def icon_activated(self, reason):
-        if reason == QtWidgets.QSystemTrayIcon.ActivationReason.DoubleClick:
+        if reason == QtWidgets.QSystemTrayIcon.DoubleClick:
             self.show()
 
     def moveEvent(self, a0: QtGui.QMoveEvent) -> None:
@@ -817,12 +789,9 @@ class FormWidget(QtWidgets.QWidget):
 
 if __name__ == "__main__":
     sentry_sdk.init("https://71bf000cb7c5448c8c08660b29a12c09@o407859.ingest.sentry.io/5277612",
-                    release=f"spotifylyrics@{backend.get_version()}", auto_enabling_integrations=False)
+                    release="spotifylyrics@" + str(backend.get_version()), auto_enabling_integrations=False)
     with sentry_sdk.configure_scope() as scope:
-        try:
-            scope.set_user({"username": getpass.getuser()})
-        except ModuleNotFoundError:
-            pass
+        scope.set_user({"username": getpass.getuser()})
         if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
             running = "pyinstaller"
         else:
